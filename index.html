@@ -3,17 +3,17 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>学習発表会 音響コントローラ Pro Advanced</title>
+<title>学習発表会 音響コントローラ Pro+</title>
 <style>
   :root{
-    --bg:#0f1115; --fg:#e8eaf0; --muted:#aab3c5; --accent:#7aa2ff; --danger:#ff5d5d; --ok:#2ecc71; --panel:#161a22; --btn:#202736; --border:#2a3142; --yellow:#ffd166; --purple:#b19cd9;
+    --bg:#0f1115; --fg:#e8eaf0; --muted:#aab3c5; --accent:#7aa2ff; --danger:#ff5d5d; --ok:#2ecc71; --panel:#161a22; --btn:#202736; --border:#2a3142; --yellow:#ffd166;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
   body{margin:0;background:var(--bg);color:var(--fg);font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI","Noto Sans JP","Hiragino Kaku Gothic ProN","Meiryo",sans-serif}
   header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border);position:sticky;top:0;background:linear-gradient(180deg,rgba(15,17,21,.97),rgba(15,17,21,.9));backdrop-filter:blur(4px);z-index:10}
   h1{font-size:18px;margin:0;font-weight:800;letter-spacing:.02em}
-  .container{display:grid;grid-template-columns:420px 1fr;gap:12px;padding:12px;min-height:calc(100vh - 56px)}
-  @media (max-width: 1200px){.container{grid-template-columns:1fr}}
+  .container{display:grid;grid-template-columns:380px 1fr;gap:12px;padding:12px;min-height:calc(100vh - 56px)}
+  @media (max-width: 980px){.container{grid-template-columns:1fr}}
   .panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:12px}
   .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .stack{display:grid;gap:8px}
@@ -23,23 +23,18 @@
   .btn.primary{background:var(--accent);border-color:transparent;color:#0b1020}
   .btn.danger{background:var(--danger);border-color:transparent;color:#0b1020}
   .btn.ok{background:var(--ok);border-color:transparent;color:#0b1020}
-  .btn.purple{background:var(--purple);border-color:transparent;color:#0b1020}
-  .btn.small{padding:8px 12px;font-size:14px}
   input[type="number"],input[type="text"],input[type="url"]{background:#0e1220;border:1px solid var(--border);color:var(--fg);border-radius:10px;padding:12px 10px;font-size:16px}
   input[type="range"]{width:100%; touch-action: none;}
-  small.mono{font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;color:var(--muted)}
-  .playlist{list-style:none;padding:0;margin:8px 0 0;max-height:calc(50vh - 200px);overflow:auto}
+  small.mono{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--muted)}
+  .playlist{list-style:none;padding:0;margin:8px 0 0;max-height:calc(100vh - 420px);overflow:auto}
   .playlist li{display:flex;align-items:center;gap:8px;padding:10px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;background:#121722}
   .playlist li.active{outline:2px solid var(--accent);background:#141a28}
-  .playlist li.bgm-active{outline:2px solid var(--purple);background:#1a1428}
   .playlist li .name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .badge{font-size:12px;padding:2px 6px;border-radius:999px;border:1px solid var(--border);color:var(--muted)}
   .drag{cursor:grab;opacity:.85}
   .progress{height:26px;background:#0b0f18;border:1px solid var(--border);border-radius:12px;position:relative;overflow:hidden;cursor:pointer}
   .progress>.bar{position:absolute;top:0;left:0;bottom:0;width:0%;background:linear-gradient(90deg,var(--accent),#a0b7ff)}
-  .progress.bgm>.bar{background:linear-gradient(90deg,var(--purple),#c9b6e8)}
-  .timer{font-variant-numeric:tabular-nums;font-size:44px;font-weight:900;letter-spacing:.02em}
-  .timer.small{font-size:24px}
+  .timer{font-variant-numeric:tabular-nums;font-size:32px;font-weight:900;letter-spacing:.02em}
   .toggle{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
   .toggle input{appearance:none;width:44px;height:26px;border-radius:999px;background:#20283a;position:relative;border:1px solid var(--border)}
   .toggle input:checked{background:var(--accent)}
@@ -50,135 +45,136 @@
   meter.level{width:100%;height:14px}
   fieldset{border:1px solid var(--border);border-radius:12px;padding:10px}
   legend{padding:0 6px;color:var(--muted)}
-  .disabled{opacity:.5;pointer-events:none}
   .dropzone{border:2px dashed var(--border);border-radius:12px;padding:16px;text-align:center;color:var(--muted)}
   .dropzone.dragging{border-color:var(--accent);color:var(--accent);background:#11162a}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
-  .tabs{display:flex;border-bottom:1px solid var(--border);margin-bottom:8px}
-  .tab{padding:8px 16px;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted)}
-  .tab.active{color:var(--accent);border-bottom-color:var(--accent)}
-  .tab-content{display:none}
-  .tab-content.active{display:block}
 </style>
 </head>
 <body>
 <header>
-  <h1>🎛️ 学習発表会・音響コントローラ Pro Advanced</h1>
+  <h1>🎛️ 学習発表会・音響コントローラ Pro+</h1>
   <div class="row">
     <label class="toggle" title="画面をスリープさせない(可能な端末のみ)"><input id="wakeLockToggle" type="checkbox" /> <span>スリープ防止</span></label>
-    <button id="panicBtn" class="btn danger" title="全音源を即停止">🧯 パニック停止</button>
+    <button id="panicBtn" class="btn danger" title="音を即ミュート & 停止">🧯 パニック停止</button>
   </div>
 </header>
 
 <div class="container">
-  <!-- 左：プレイリスト -->
-  <aside class="stack">
-    <!-- プレイリストタブ -->
-    <div class="panel">
-      <div class="tabs">
-        <div class="tab active" data-tab="main">🎵 メイン</div>
-        <div class="tab" data-tab="bgm">🎼 BGMライブラリ</div>
-      </div>
-      
-      <!-- メインプレイリスト -->
-      <div class="tab-content active" data-content="main">
-        <div class="row" style="justify-content:space-between">
-          <strong>メイン楽曲</strong>
-          <span class="badge" id="countBadge">0 曲</span>
-        </div>
-        <div class="row" style="margin-top:8px">
-          <input id="search" type="text" placeholder="検索 (曲名)" style="flex:1"/>
-        </div>
-        <div class="row" style="margin-top:8px">
-          <input id="fileInput" type="file" accept="audio/*" multiple style="display:none"/>
-          <button id="addFiles" class="btn">📁 追加</button>
-          <button id="addUrl" class="btn">🌐 URL</button>
-          <button id="clearList" class="btn small" title="全消去">🧹</button>
-        </div>
-        <div id="dropzone" class="dropzone" style="margin-top:8px">メイン音源をドラッグ&ドロップ</div>
-        <ul id="playlist" class="playlist" aria-label="Main Playlist"></ul>
-        <div class="row" style="margin-top:6px; justify-content:space-between">
-          <label class="toggle" title="曲が終わったら次へ">
-            <input id="autoAdvance" type="checkbox" checked>
-            <span>自動で次へ</span>
-          </label>
-          <label class="toggle" title="再生時はINから再生">
-            <input id="playFromIn" type="checkbox" checked>
-            <span>INから再生</span>
-          </label>
-        </div>
-      </div>
-
-      <!-- BGMライブラリ -->
-      <div class="tab-content" data-content="bgm">
-        <div class="row" style="justify-content:space-between">
-          <strong>BGMライブラリ</strong>
-          <span class="badge" id="bgmCountBadge">0 曲</span>
-        </div>
-        <div class="row" style="margin-top:8px">
-          <input id="bgmSearch" type="text" placeholder="BGM検索" style="flex:1"/>
-        </div>
-        <div class="row" style="margin-top:8px">
-          <input id="bgmFileInput" type="file" accept="audio/*" multiple style="display:none"/>
-          <button id="bgmAddFiles" class="btn purple">📁 BGM追加</button>
-          <button id="bgmAddUrl" class="btn purple">🌐 URL</button>
-          <button id="bgmClearList" class="btn small" title="BGM全消去">🧹</button>
-        </div>
-        <div id="bgmDropzone" class="dropzone" style="margin-top:8px">BGMファイルをドラッグ&ドロップ</div>
-        <ul id="bgmPlaylist" class="playlist" aria-label="BGM Library"></ul>
-      </div>
+  <aside class="panel" id="left">
+    <div class="row" style="justify-content:space-between">
+      <strong>プレイリスト</strong>
+      <span class="badge" id="countBadge">0 曲</span>
     </div>
+    <div class="row" style="margin-top:8px">
+      <input id="search" type="text" placeholder="検索 (曲名)" style="flex:1"/>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <input id="fileInput" type="file" accept="audio/*" multiple style="display:none"/>
+      <button id="addFiles" class="btn">📁 ファイル追加</button>
+      <button id="addUrl" class="btn">🌐 URL追加</button>
+      <button id="clearList" class="btn" title="静的リスト以外を全消去">🧹 クリア</button>
+    </div>
+    <div id="dropzone" class="dropzone" style="margin-top:8px">ここに音声ファイルをドラッグ&ドロップ</div>
 
-    <!-- BGMコントロール -->
-    <section class="panel">
-      <div class="row" style="justify-content:space-between">
-        <strong>🎼 BGMコントロール</strong>
-        <label class="toggle"><input id="bgmLoop" type="checkbox" checked><span>ループ</span></label>
-      </div>
-      <div class="row" style="margin-top:8px">
-        <div class="timer small"><span id="bgmElapsed">00:00</span> / <span id="bgmDuration">00:00</span></div>
-      </div>
-      <div class="progress bgm" id="bgmProgress" aria-label="BGMシークバー" title="タップで移動">
-        <div class="bar" id="bgmProgressBar"></div>
-      </div>
-      <div class="grid3" style="margin-top:8px">
-        <button id="bgmPlay" class="btn purple">▶ 再生</button>
-        <button id="bgmPause" class="btn">⏸ 停止</button>
-        <button id="bgmMute" class="btn">🔇 ミュート</button>
-      </div>
-      <div class="row" style="gap:6px">
-        <button id="bgmFadeIn" class="btn ok">🌅 IN</button>
-        <input id="bgmFadeInSec" type="number" min="0" step="0.1" value="2.0" style="width:80px">
-        <button id="bgmFadeOut" class="btn danger">🌇 OUT</button>
-        <input id="bgmFadeOutSec" type="number" min="0" step="0.1" value="2.0" style="width:80px">
-      </div>
-      <div class="row" style="align-items:center;margin-top:6px">
-        <button id="bgmVolDown" class="btn small">−5%</button>
-        <input id="bgmVolume" type="range" min="0" max="1" step="0.001" value="0.5" style="flex:1">
-        <input id="bgmVolNum" type="number" min="0" max="100" step="1" value="50" style="width:80px">
-        <button id="bgmVolUp" class="btn small">＋5%</button>
-      </div>
-      <div style="margin-top:6px">
-        <meter id="bgmLevel" class="level" min="-60" low="-24" high="-12" max="0" value="-60"></meter>
-        <div class="row" style="justify-content:space-between"><small class="mono">BGMレベル</small><small class="mono" id="bgmLevelDb">-∞ dB</small></div>
-      </div>
-      <div class="row" style="margin-top:6px;justify-content:space-between">
-        <label class="toggle" title="メイントラック再生中にBGMを自動で下げる">
-          <input id="duckEnable" type="checkbox" checked> <span>デュッキング</span>
-        </label>
-        <div class="row">
-          <label class="row"><small>目標%</small><input id="duckTarget" type="number" min="0" max="100" step="1" value="20" style="width:70px"></label>
-          <label class="row"><small>時間(秒)</small><input id="duckSec" type="number" min="0" step="0.1" value="0.6" style="width:80px"></label>
-        </div>
-      </div>
-      <div class="row" style="margin-top:6px"><small class="mono" id="bgmTitle">BGM: —</small></div>
-    </section>
+    <ul id="playlist" class="playlist" aria-label="Playlist"></ul>
+
+    <div class="row" style="margin-top:6px; justify-content:space-between">
+      <label class="toggle" title="曲が終わったら次へ">
+        <input id="autoAdvance" type="checkbox" checked>
+        <span>自動で次へ</span>
+      </label>
+      <label class="toggle" title="再生時はINから再生">
+        <input id="playFromIn" type="checkbox" checked>
+        <span>INから再生</span>
+      </label>
+    </div>
   </aside>
 
-  <!-- 右：メインコントロール -->
-  <main class="stack">
-    <!-- 現在の曲 -->
+  <main class="stack" id="right">
+    <section class="panel">
+      <div class="row" style="justify-content:space-between;align-items:flex-end">
+        <div>
+          <strong>🎵 BGM（常時ループ用&個別操作）</strong>
+          <div class="row" style="margin-top:6px">
+            <input id="bgmFileInput" type="file" accept="audio/*" style="display:none"/>
+            <button id="bgmAddFile" class="btn">📁 BGMファイル</button>
+            <button id="bgmAddUrl" class="btn">🌐 BGM URL</button>
+            <label class="toggle" style="margin-left:8px"><input id="bgmLoop" type="checkbox" checked><span>ループ</span></label>
+          </div>
+          <div style="margin-top:6px"><small class="mono" id="bgmTitle">BGM: —</small></div>
+        </div>
+        <div style="text-align:right;min-width:180px">
+          <div class="timer"><span id="bgmElapsed">00:00</span> / <span id="bgmDuration">00:00</span></div>
+          <small class="mono">残り <span id="bgmRemaining">00:00</span></small>
+        </div>
+      </div>
+
+      <div class="progress" id="bgmProgress" title="タップで移動"><div class="bar" id="bgmProgressBar"></div></div>
+
+      <div class="grid3" style="margin-top:8px">
+        <button id="bgmPlay" class="btn ok">▶ BGM再生</button>
+        <button id="bgmPause" class="btn">⏸ 停止</button>
+        <button id="bgmStop" class="btn">⏹ 先頭へ停止</button>
+      </div>
+      <div class="grid3">
+        <button id="bgmSeekBack" class="btn">⏮ −5秒</button>
+        <div class="row" style="justify-content:center;width:100%">
+          <button id="bgmFadeIn" class="btn ok">🌅 フェードIN</button>
+          <label class="row"><small>秒:</small><input id="bgmFadeInSec" type="number" min="0" step="0.1" value="1.5" style="width:90px"></label>
+        </div>
+        <button id="bgmSeekFwd" class="btn">⏭ ＋5秒</button>
+      </div>
+      <div class="grid3">
+        <div></div>
+        <div class="row" style="justify-content:center;width:100%">
+          <button id="bgmFadeOut" class="btn danger">🌇 フェードOUT</button>
+          <label class="row"><small>秒:</small><input id="bgmFadeOutSec" type="number" min="0" step="0.1" value="1.5" style="width:90px"></label>
+          <button id="bgmFadeStop" class="btn danger" title="フェードOUT後に停止">🌃 OUT→停止</button>
+        </div>
+        <div></div>
+      </div>
+
+      <fieldset style="margin-top:8px">
+        <legend>BGM音量</legend>
+        <div class="row" style="align-items:center;gap:12px">
+          <button id="bgmVolDown" class="btn">−5%</button>
+          <input id="bgmVolume" type="range" min="0" max="1" step="0.001" value="0.5" style="flex:1">
+          <input id="bgmVolNum" type="number" min="0" max="100" step="1" value="50" style="width:88px">
+          <button id="bgmVolUp" class="btn">＋5%</button>
+          <label class="toggle" style="margin-left:8px"><input id="bgmStartFromZero" type="checkbox"><span>0→フェード</span></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>BGMキューポイント</legend>
+        <div class="row" style="gap:8px;flex-wrap:wrap">
+          <button id="bgmSetIn" class="btn">IN 設定</button>
+          <button id="bgmSetOut" class="btn">OUT 設定</button>
+          <button id="bgmGoIn" class="btn">⤴ INへ</button>
+          <button id="bgmClearCue" class="btn">クリア</button>
+          <label class="toggle" title="OUTで自動停止(少しフェード)">
+            <input id="bgmAutoStopAtOut" type="checkbox"><span>OUTで停止</span>
+          </label>
+        </div>
+        <div class="row" style="gap:16px;margin-top:6px">
+          <small class="mono">IN: <span id="bgmInTime">—</span></small>
+          <small class="mono">OUT: <span id="bgmOutTime">—</span></small>
+        </div>
+      </fieldset>
+
+      <div class="row" style="margin-top:6px;justify-content:space-between">
+        <label class="toggle" title="メイントラック再生中にBGMを自動で下げる（従来機能）">
+          <input id="duckEnable" type="checkbox" checked> <span>デュッキングON</span>
+        </label>
+        <div class="row">
+          <label class="row"><small>目標%</small><input id="duckTarget" type="number" min="0" max="100" step="1" value="20" style="width:80px"></label>
+          <label class="row"><small>時間(秒)</small><input id="duckSec" type="number" min="0" step="0.1" value="0.6" style="width:90px"></label>
+          <label class="row"><small>戻し(秒)</small><input id="unduckSec" type="number" min="0" step="0.1" value="0.8" style="width:90px"></label>
+        </div>
+      </div>
+    </section>
+
     <section class="panel">
       <div class="row" style="justify-content:space-between">
         <div>
@@ -193,30 +189,27 @@
         </div>
       </div>
 
-      <div class="progress" id="progress" aria-label="シークバー" title="タップで移動">
-        <div class="bar" id="progressBar"></div>
-      </div>
+      <div class="progress" id="progress" title="タップで移動"><div class="bar" id="progressBar"></div></div>
 
-      <!-- 大きめボタン（iPad向け） -->
       <div class="grid3" style="margin-top:8px">
-        <button id="playPause" class="btn primary">▶ 再生</button>
-        <button id="stop" class="btn">⏹ 停止</button>
+        <button id="playPause" class="btn primary">▶️ 再生</button>
+        <button id="stop" class="btn">⏹️ 停止</button>
         <button id="mute" class="btn">🔇 ミュート</button>
       </div>
       <div class="grid3">
         <button id="seekBack" class="btn">⏮ −5秒</button>
         <div class="row" style="justify-content:center;width:100%">
-          <button id="fadeInBtn" class="btn ok">🌅 IN</button>
-          <input id="fadeInSec" type="number" min="0" step="0.1" value="2.0" style="width:80px">
+          <button id="fadeInBtn" class="btn ok">🌅 フェードIN</button>
+          <label class="row"><small>秒:</small><input id="fadeInSec" type="number" min="0" step="0.1" value="2.0" style="width:90px"></label>
         </div>
         <button id="seekFwd" class="btn">⏭ ＋5秒</button>
       </div>
       <div class="grid3">
         <button id="prevBtn" class="btn">⬆ 前の曲</button>
         <div class="row" style="justify-content:center;width:100%">
-          <button id="fadeOutBtn" class="btn danger">🌇 OUT</button>
-          <input id="fadeOutSec" type="number" min="0" step="0.1" value="2.0" style="width:80px">
-          <button id="fadeStopBtn" class="btn danger" title="フェードアウト後に停止">🌃 OUT→停止</button>
+          <button id="fadeOutBtn" class="btn danger">🌇 フェードOUT</button>
+          <label class="row"><small>秒:</small><input id="fadeOutSec" type="number" min="0" step="0.1" value="2.0" style="width:90px"></label>
+          <button id="fadeStopBtn" class="btn danger" title="フェードOUT後に停止">🌃 OUT→停止</button>
         </div>
         <button id="nextBtn" class="btn">⬇ 次の曲</button>
       </div>
@@ -224,28 +217,28 @@
       <fieldset style="margin-top:8px">
         <legend>メイン音量</legend>
         <div class="row" style="align-items:center;gap:12px">
-          <button id="volDown" class="btn small">−5%</button>
+          <button id="volDown" class="btn">−5%</button>
           <input id="volume" type="range" min="0" max="1" step="0.001" value="1" style="flex:1">
-          <input id="volNum" type="number" min="0" max="100" step="1" value="100" style="width:80px">
-          <button id="volUp" class="btn small">＋5%</button>
+          <input id="volNum" type="number" min="0" max="100" step="1" value="100" style="width:88px">
+          <button id="volUp" class="btn">＋5%</button>
+          <label class="toggle" style="margin-left:8px"><input id="startFromZero" type="checkbox"><span>0→フェード</span></label>
         </div>
         <div style="margin-top:6px">
           <meter id="level" class="level" min="-60" low="-24" high="-12" max="0" value="-60"></meter>
-          <div class="row" style="justify-content:space-between"><small class="mono">メインレベル</small><small class="mono" id="levelDb">-∞ dB</small></div>
+          <div class="row" style="justify-content:space-between"><small class="mono">レベル</small><small class="mono" id="levelDb">-∞ dB</small></div>
         </div>
-        <label class="toggle" title="ボリュームを0から上げたい時ON" style="margin-top:6px;display:inline-flex">
-          <input id="startFromZero" type="checkbox"> <span>0→フェード</span>
-        </label>
       </fieldset>
 
       <fieldset>
         <legend>キューポイント</legend>
         <div class="row" style="gap:8px;flex-wrap:wrap">
-          <button id="setIn" class="btn small">IN 設定</button>
-          <button id="setOut" class="btn small">OUT 設定</button>
-          <button id="goIn" class="btn small">⤴ INへ</button>
-          <button id="clearCue" class="btn small">クリア</button>
-          <label class="toggle" title="OUTで自動停止(少しフェード)"><input id="autoStopAtOut" type="checkbox"><span>OUTで停止</span></label>
+          <button id="setIn" class="btn">IN 設定</button>
+          <button id="setOut" class="btn">OUT 設定</button>
+          <button id="goIn" class="btn">⤴ INへ</button>
+          <button id="clearCue" class="btn">クリア</button>
+          <label class="toggle" title="OUTで自動停止(少しフェード)">
+            <input id="autoStopAtOut" type="checkbox"><span>OUTで停止</span>
+          </label>
         </div>
         <div class="row" style="gap:16px;margin-top:6px">
           <small class="mono">IN: <span id="inTime">—</span></small>
@@ -254,13 +247,12 @@
       </fieldset>
 
       <details class="panel" open style="background:#121722;margin-top:8px">
-        <summary>ℹ️ 機能説明</summary>
+        <summary>ℹ️ ヒント</summary>
         <div style="margin-top:6px;color:var(--muted);font-size:14px">
-          ・iPad対応：全部ボタン操作OK（キーボード不要）<br>
-          ・BGMライブラリでBGMを管理・選択<br>
-          ・BGMも高度なフェードイン・アウト機能付き<br>
-          ・デュッキング：メイン再生中にBGMを自動で下げる<br>
-          ・レベルメーターでメイン・BGM両方の音量レベルを監視
+          ・iPad完全タッチ操作OK<br>
+          ・BGMはメイン相当の操作＋自動デュッキングの両対応<br>
+          ・URL追加はCORS許可が必要な場合あり<br>
+          <strong style="color:var(--yellow)">・IN/OUT/音量/フェード設定はすべてブラウザに自動保存されます。</strong>
         </div>
       </details>
     </section>
@@ -268,7 +260,7 @@
 </div>
 
 <footer>
-  <small class="note">ローカルの音声ファイルはブラウザ内だけで使われ、外部にアップロードされません。URLで追加した曲のみ保存されます。</small>
+  <small class="note">ローカルの音声ファイルはブラウザ内だけで使われ、外部にアップロードされません。URLで追加した曲や、静的リストの設定は保存されます。</small>
 </footer>
 
 <audio id="audio" crossorigin="anonymous"></audio>
@@ -277,30 +269,39 @@
 <script>
 (() => {
   const $ = (sel) => document.querySelector(sel);
-  const $$ = (sel) => Array.from(document.querySelectorAll(sel));
   const audio = $('#audio');
-  const bgm = $('#bgm');
+  const bgm   = $('#bgm');
 
-  // ===== Audio Graph =====
-  let ctx, mainSrc, bgmSrc, mainGain, bgmGain, mainAnalyser, bgmAnalyser, mainDataArray, bgmDataArray;
+  // ===== Static Track List (GitHub Pagesにアップロードするファイル) =====
+  // 拡張子まで正確に記述してください。ファイルはリポジトリ内の 'audio/' フォルダに配置することを推奨します。
+  const STATIC_TRACKS = [
+    // type: 'static' は設定が保存される曲です。idは一意にしてください。
+    { id: 'static-bgm-default', name: 'デフォルトBGM', url: 'audio/bgm_loop.mp3', type: 'bgm', initialVolume: 0.5 },
+    { id: 'static-track-1', name: '入場曲', url: 'audio/track_01_entrance.mp3', type: 'static', initialVolume: 1.0 },
+    { id: 'static-track-2', name: '効果音・拍手', url: 'audio/se_clapping.wav', type: 'static', initialVolume: 1.0 },
+    { id: 'static-track-3', name: '効果音・ファンファーレ', url: 'audio/se_fanfare.mp3', type: 'static', initialVolume: 1.0 },
+    // ここにファイルを追加してください
+    // 例: { id: 'static-track-4', name: '新しい曲', url: 'audio/new_song.mp3', type: 'static', initialVolume: 0.8 },
+  ];
+  // STATIC_TRACKSに含まれない曲は 'local' または 'url' となり、クリアボタンで消去可能です。
+  const STATIC_TRACK_IDS = new Set(STATIC_TRACKS.map(t => t.id));
+  const BGM_ID = 'static-bgm-default';
+
+  // ===== WebAudio Graph & Helpers =====
+  let ctx, mainSrc, bgmSrc, mainGain, bgmGain, analyser, dataArray;
   function ensureCtx(){
     if(ctx) return;
     ctx = new (window.AudioContext || window.webkitAudioContext)();
+    // 最初のユーザー操作（ボタンクリックなど）でしかresumeできないため、ここで呼んでおく
+    if(ctx.state === 'suspended') ctx.resume().catch(e=>console.error('AudioContext resume failed:', e));
     mainSrc = ctx.createMediaElementSource(audio);
-    bgmSrc = ctx.createMediaElementSource(bgm);
-    
+    bgmSrc  = ctx.createMediaElementSource(bgm);
     mainGain = ctx.createGain(); mainGain.gain.value = 1;
-    bgmGain = ctx.createGain(); bgmGain.gain.value = 0.5;
-    
-    mainAnalyser = ctx.createAnalyser(); mainAnalyser.fftSize = 2048;
-    bgmAnalyser = ctx.createAnalyser(); bgmAnalyser.fftSize = 2048;
-    mainDataArray = new Uint8Array(mainAnalyser.frequencyBinCount);
-    bgmDataArray = new Uint8Array(bgmAnalyser.frequencyBinCount);
-    
-    // routing: main -> mainGain -> mainAnalyser -> dest
-    //          bgm -> bgmGain -> bgmAnalyser -> dest
-    mainSrc.connect(mainGain).connect(mainAnalyser).connect(ctx.destination);
-    bgmSrc.connect(bgmGain).connect(bgmAnalyser).connect(ctx.destination);
+    bgmGain  = ctx.createGain(); bgmGain.gain.value  = 0.5;
+    analyser = ctx.createAnalyser(); analyser.fftSize = 2048;
+    dataArray = new Uint8Array(analyser.frequencyBinCount);
+    mainSrc.connect(mainGain).connect(analyser).connect(ctx.destination);
+    bgmSrc.connect(bgmGain).connect(ctx.destination);
   }
   function now(){ ensureCtx(); return ctx.currentTime; }
   function clamp01(x){ return Math.max(0, Math.min(1, x)); }
@@ -311,45 +312,186 @@
     const cur = node.gain.value;
     node.gain.cancelScheduledValues(n);
     node.gain.setValueAtTime(cur, n);
-    if(t===0){ node.gain.setValueAtTime(clamp01(target), n); return; }
     node.gain.linearRampToValueAtTime(clamp01(target), n + t);
   }
 
-  // ===== State =====
+  // ===== State (Update to manage all settings) =====
   const state = {
-    tracks: [], // メイントラック
-    bgmTracks: [], // BGMトラック
+    tracks: [], // Contains static, local (file blob), and url tracks
+    bgmTrack: null, // BGM track object
     filter: '',
-    bgmFilter: '',
     currentIndex: -1,
-    currentBgmIndex: -1,
     wakeLock: null,
-    duck: { enable:true, target:0.2, sec:0.6, prevVol:0.5 },
-    activeTab: 'main'
+    duck: { enable:true, prevVol:0.5 },
   };
-
-  // ===== UI refs =====
-  const playlistEl = $('#playlist');
-  const bgmPlaylistEl = $('#bgmPlaylist');
-  const countBadge = $('#countBadge');
-  const bgmCountBadge = $('#bgmCountBadge');
-  const titleEl = $('#title');
-  const bgmTitle = $('#bgmTitle');
   
-  // Time displays
+  // ===== Persistence (Save/Restore all track/bgm settings) =====
+  const STORAGE_KEY = 'soundboard.config.proplus.v2';
+
+  // UIの設定値をstateに反映してlocalStorageに保存する関数
+  function saveConfig(){
+      ensureCtx();
+      const config = {
+          // メインプレイリストの全トラックの設定を保存
+          tracks: state.tracks.map(t => ({
+              id: t.id,
+              name: t.name,
+              url: t.url,
+              type: t.type, // static, local, url
+              cueIn: t.cueIn,
+              cueOut: t.cueOut,
+              volume: t.volume,
+          })),
+          // BGMの設定を保存
+          bgm: state.bgmTrack ? {
+              id: state.bgmTrack.id,
+              url: state.bgmTrack.url,
+              name: state.bgmTrack.name,
+              type: state.bgmTrack.type,
+              cueIn: state.bgmTrack.cueIn,
+              cueOut: state.bgmTrack.cueOut,
+              volume: state.bgmTrack.volume,
+              loop: bgmLoop.checked,
+          } : null,
+          // グローバル設定 (ボリュームはGainNodeから直接取得)
+          globalSettings: {
+              mainVolume: mainGain.gain.value,
+              bgmVolume: bgmGain.gain.value,
+              fadeInSec: Number(fadeInSec.value),
+              fadeOutSec: Number(fadeOutSec.value),
+              bgmFadeInSec: Number(bgmFadeInSec.value),
+              bgmFadeOutSec: Number(bgmFadeOutSec.value),
+              duckEnable: duckEnable.checked,
+              duckTarget: Number(duckTarget.value),
+              duckSec: Number(duckSec.value),
+              unduckSec: Number(unduckSec.value),
+              autoAdvance: autoAdvance.checked,
+              playFromIn: playFromIn.checked,
+              autoStopAtOut: autoStopAtOut.checked,
+              bgmAutoStopAtOut: bgmAutoStopAtOut.checked,
+              startFromZero: startFromZero.checked,
+              bgmStartFromZero: bgmStartFromZero.checked,
+              currentIndex: state.currentIndex,
+          }
+      };
+      // ローカルファイル (blob) は保存しない。URLトラックと静的トラックのみ残す
+      config.tracks = config.tracks.filter(t => t.type !== 'local');
+      try{
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+      }catch(e){ console.error('Failed to save config to localStorage', e); }
+  }
+
+  // localStorageから設定を復元する関数
+  function restoreConfig(){
+      let savedConfig = {};
+      try{
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if(raw) savedConfig = JSON.parse(raw);
+      }catch(e){ console.error('Failed to load config from localStorage', e); }
+
+      // 1. 静的トラックの初期化と設定の上書き
+      const savedTracks = savedConfig.tracks || [];
+      
+      // 静的トラック (STATIC_TRACKS) の処理
+      STATIC_TRACKS.filter(t => t.type !== 'bgm').forEach(staticT => {
+          const savedT = savedTracks.find(t => t.id === staticT.id);
+          state.tracks.push({
+              id: staticT.id,
+              name: staticT.name,
+              url: staticT.url,
+              type: 'static',
+              cueIn: savedT?.cueIn ?? null,
+              cueOut: savedT?.cueOut ?? null,
+              volume: savedT?.volume ?? staticT.initialVolume,
+          });
+      });
+      
+      // URLトラックの復元
+      savedTracks.filter(t => t.type === 'url').forEach(urlT => {
+          state.tracks.push({
+              id: urlT.id,
+              name: urlT.name,
+              url: urlT.url,
+              type: 'url',
+              cueIn: urlT.cueIn,
+              cueOut: urlT.cueOut,
+              volume: urlT.volume,
+          });
+      });
+
+      // 2. BGMトラックの初期化と設定の上書き
+      const initialBgm = STATIC_TRACKS.find(t => t.type === 'bgm');
+      const savedBgm = savedConfig.bgm;
+      state.bgmTrack = initialBgm ? {
+          id: initialBgm.id,
+          name: initialBgm.name,
+          url: initialBgm.url,
+          type: 'bgm',
+          cueIn: savedBgm?.cueIn ?? null,
+          cueOut: savedBgm?.cueOut ?? null,
+          volume: savedBgm?.volume ?? initialBgm.initialVolume,
+          loop: savedBgm?.loop ?? true,
+      } : null;
+
+      if(state.bgmTrack){
+          bgm.src = state.bgmTrack.url; bgm.load();
+          bgmTitle.textContent = 'BGM: ' + state.bgmTrack.name;
+          bgmLoop.checked = state.bgmTrack.loop;
+          bgmInTimeEl.textContent = state.bgmTrack.cueIn!=null ? formatTime(state.bgmTrack.cueIn) : '—';
+          bgmOutTimeEl.textContent = state.bgmTrack.cueOut!=null ? formatTime(state.bgmTrack.cueOut) : '—';
+          // BGM音量はinitフェーズでまとめて設定
+      }
+
+      // 3. グローバル設定の復元
+      const global = savedConfig.globalSettings || {};
+      
+      // トグル・数値入力の復元
+      autoAdvance.checked = global.autoAdvance ?? true;
+      playFromIn.checked = global.playFromIn ?? true;
+      autoStopAtOut.checked = global.autoStopAtOut ?? false;
+      bgmAutoStopAtOut.checked = global.bgmAutoStopAtOut ?? false;
+      startFromZero.checked = global.startFromZero ?? false;
+      bgmStartFromZero.checked = global.bgmStartFromZero ?? false;
+      duckEnable.checked = global.duckEnable ?? true;
+
+      fadeInSec.value = String(global.fadeInSec ?? 2.0);
+      fadeOutSec.value = String(global.fadeOutSec ?? 2.0);
+      bgmFadeInSec.value = String(global.bgmFadeInSec ?? 1.5);
+      bgmFadeOutSec.value = String(global.bgmFadeOutSec ?? 1.5);
+      duckTarget.value = String(global.duckTarget ?? 20);
+      duckSec.value = String(global.duckSec ?? 0.6);
+      unduckSec.value = String(global.unduckSec ?? 0.8);
+
+      // Volume slider/numの初期値設定（initでGainNodeに適用される）
+      volumeSlider.value = String(global.mainVolume ?? 1);
+      volNum.value = String(Math.round((global.mainVolume ?? 1)*100));
+      bgmVolume.value = String(global.bgmVolume ?? 0.5);
+      bgmVolNum.value = String(Math.round((global.bgmVolume ?? 0.5)*100));
+
+      // 選択インデックスの復元
+      state.currentIndex = global.currentIndex ?? (state.tracks.length > 0 ? 0 : -1);
+      if(state.tracks.length) selectIndex(state.currentIndex); else renderPlaylist();
+  }
+
+  // ===== Common helpers (moved to top) =====
+  function formatTime(sec){
+    if(!isFinite(sec)) return '00:00';
+    sec = Math.max(0, Math.floor(sec));
+    const m = Math.floor(sec / 60).toString().padStart(2,'0');
+    const s = (sec % 60).toString().padStart(2,'0');
+    return `${m}:${s}`;
+  }
+
+  // ====== UI Refs (Main) ======
+  const playlistEl = $('#playlist');
+  const countBadge = $('#countBadge');
+  const titleEl = $('#title');
   const elapsedEl = $('#elapsed');
   const durationEl = $('#duration');
   const remainingEl = $('#remaining');
-  const bgmElapsedEl = $('#bgmElapsed');
-  const bgmDurationEl = $('#bgmDuration');
-  
-  // Progress bars
   const progress = $('#progress');
   const progressBar = $('#progressBar');
-  const bgmProgress = $('#bgmProgress');
-  const bgmProgressBar = $('#bgmProgressBar');
 
-  // Main controls
   const playPauseBtn = $('#playPause');
   const stopBtn = $('#stop');
   const muteBtn = $('#mute');
@@ -358,7 +500,6 @@
   const prevBtn = $('#prevBtn');
   const nextBtn = $('#nextBtn');
 
-  // Fade controls
   const fadeInBtn = $('#fadeInBtn');
   const fadeOutBtn = $('#fadeOutBtn');
   const fadeStopBtn = $('#fadeStopBtn');
@@ -366,31 +507,14 @@
   const fadeOutSec = $('#fadeOutSec');
   const startFromZero = $('#startFromZero');
 
-  // Volume controls
   const volumeSlider = $('#volume');
   const volNum = $('#volNum');
   const volDown = $('#volDown');
   const volUp = $('#volUp');
+
   const levelMeter = $('#level');
   const levelDb = $('#levelDb');
 
-  // BGM controls
-  const bgmPlayBtn = $('#bgmPlay');
-  const bgmPauseBtn = $('#bgmPause');
-  const bgmMuteBtn = $('#bgmMute');
-  const bgmFadeInBtn = $('#bgmFadeIn');
-  const bgmFadeOutBtn = $('#bgmFadeOut');
-  const bgmFadeInSec = $('#bgmFadeInSec');
-  const bgmFadeOutSec = $('#bgmFadeOutSec');
-  const bgmVolume = $('#bgmVolume');
-  const bgmVolNum = $('#bgmVolNum');
-  const bgmVolDown = $('#bgmVolDown');
-  const bgmVolUp = $('#bgmVolUp');
-  const bgmLevel = $('#bgmLevel');
-  const bgmLevelDb = $('#bgmLevelDb');
-  const bgmLoop = $('#bgmLoop');
-
-  // Cue controls
   const setInBtn = $('#setIn');
   const setOutBtn = $('#setOut');
   const goInBtn = $('#goIn');
@@ -401,153 +525,116 @@
   const playFromIn = $('#playFromIn');
   const autoStopAtOut = $('#autoStopAtOut');
 
-  // File/URL inputs
   const addFilesBtn = $('#addFiles');
   const fileInput = $('#fileInput');
   const addUrlBtn = $('#addUrl');
   const clearListBtn = $('#clearList');
   const search = $('#search');
   const dropzone = $('#dropzone');
-  
-  const bgmAddFilesBtn = $('#bgmAddFiles');
-  const bgmFileInput = $('#bgmFileInput');
-  const bgmAddUrlBtn = $('#bgmAddUrl');
-  const bgmClearListBtn = $('#bgmClearList');
-  const bgmSearch = $('#bgmSearch');
-  const bgmDropzone = $('#bgmDropzone');
-
   const panicBtn = $('#panicBtn');
   const wakeLockToggle = $('#wakeLockToggle');
 
-  // Duck controls
+  // ====== UI Refs (BGM) ======
+  const bgmAddFile = $('#bgmAddFile');
+  const bgmFileInput = $('#bgmFileInput');
+  const bgmAddUrl = $('#bgmAddUrl');
+  const bgmPlayBtn = $('#bgmPlay');
+  const bgmPauseBtn = $('#bgmPause');
+  const bgmStopBtn = $('#bgmStop');
+  const bgmSeekBack = $('#bgmSeekBack');
+  const bgmSeekFwd = $('#bgmSeekFwd');
+
+  const bgmFadeInBtn = $('#bgmFadeIn');
+  const bgmFadeOutBtn = $('#bgmFadeOut');
+  const bgmFadeStopBtn = $('#bgmFadeStop');
+  const bgmFadeInSec = $('#bgmFadeInSec');
+  const bgmFadeOutSec = $('#bgmFadeOutSec');
+  const bgmStartFromZero = $('#bgmStartFromZero');
+
+  const bgmVolume = $('#bgmVolume');
+  const bgmVolNum = $('#bgmVolNum');
+  const bgmVolDown = $('#bgmVolDown');
+  const bgmVolUp = $('#bgmVolUp');
+  const bgmLoop = $('#bgmLoop');
+  const bgmTitle = $('#bgmTitle');
+
+  const bgmProgress = $('#bgmProgress');
+  const bgmProgressBar = $('#bgmProgressBar');
+  const bgmElapsedEl = $('#bgmElapsed');
+  const bgmDurationEl = $('#bgmDuration');
+  const bgmRemainingEl = $('#bgmRemaining');
+
+  const bgmSetInBtn = $('#bgmSetIn');
+  const bgmSetOutBtn = $('#bgmSetOut');
+  const bgmGoInBtn = $('#bgmGoIn');
+  const bgmClearCueBtn = $('#bgmClearCue');
+  const bgmInTimeEl = $('#bgmInTime');
+  const bgmOutTimeEl = $('#bgmOutTime');
+  const bgmAutoStopAtOut = $('#bgmAutoStopAtOut');
+
+  // デュッキング設定
   const duckEnable = $('#duckEnable');
   const duckTarget = $('#duckTarget');
   const duckSec = $('#duckSec');
+  const unduckSec = $('#unduckSec');
 
-  // ===== Tab System =====
-  $$('.tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      const tabName = tab.dataset.tab;
-      $$('.tab').forEach(t => t.classList.remove('active'));
-      $$('.tab-content').forEach(c => c.classList.remove('active'));
-      tab.classList.add('active');
-      $(`[data-content="${tabName}"]`).classList.add('active');
-      state.activeTab = tabName;
-    });
-  });
-
-  // ===== Helper Functions =====
-  function formatTime(sec){
-    if(!isFinite(sec)) return '00:00';
-    sec = Math.max(0, Math.floor(sec));
-    const m = Math.floor(sec / 60).toString().padStart(2,'0');
-    const s = (sec % 60).toString().padStart(2,'0');
-    return `${m}:${s}`;
-  }
-
-  function calculateLevel(analyser, dataArray){
-    if(!analyser) return -60;
-    analyser.getByteTimeDomainData(dataArray);
-    let sum = 0;
-    for(let i=0;i<dataArray.length;i++){
-      const v = (dataArray[i]-128)/128;
-      sum += v*v;
-    }
-    const rms = Math.sqrt(sum / dataArray.length) || 0.0000001;
-    return 20 * Math.log10(rms);
-  }
-
-  // ===== Render Playlists =====
+  // ===== Playlist render =====
   function renderPlaylist(){
-    const q = state.filter.trim().toLowerCase();
+    const q = (search.value||'').trim().toLowerCase();
     playlistEl.innerHTML = '';
     state.tracks.forEach((t, i) => {
       if(q && !t.name.toLowerCase().includes(q)) return;
       const li = document.createElement('li');
-      li.draggable = true;
+      li.draggable = t.type === 'static' ? false : true; // 静的リストはドラッグ無効
       li.dataset.index = String(i);
-      if(i === state.currentIndex) li.classList.add('active');
+      if(i===state.currentIndex) li.classList.add('active');
+      
+      let badgeHtml = '';
+      if(t.cueIn!=null) badgeHtml += `<span class="badge">IN ${formatTime(t.cueIn)}</span>`;
+      if(t.cueOut!=null) badgeHtml += `<span class="badge">OUT ${formatTime(t.cueOut)}</span>`;
+      if(t.type === 'local') badgeHtml += `<span class="badge" style="color:var(--yellow); border-color:var(--yellow)">一時ファイル</span>`;
+      else if(t.type === 'url') badgeHtml += `<span class="badge" style="color:var(--accent); border-color:var(--accent)">URL</span>`;
+
       li.innerHTML = `
-        <span class="badge drag" title="ドラッグで並び替え">↕</span>
+        <span class="badge drag" title="ドラッグで並び替え" style="cursor:${li.draggable ? 'grab' : 'default'}; opacity:${li.draggable ? '.85' : '.3'}">↕</span>
         <span class="name" title="タップで選択">${t.name}</span>
-        ${t.cueIn!=null ? `<span class="badge">IN ${formatTime(t.cueIn)}</span>`: ''}
-        ${t.cueOut!=null ? `<span class="badge">OUT ${formatTime(t.cueOut)}</span>`: ''}
-        <button class="btn small" data-act="play">▶</button>
-        <button class="btn small" data-act="remove" title="削除">✖</button>
+        ${badgeHtml}
+        <button class="btn" data-act="play">▶</button>
+        <button class="btn" data-act="remove" title="削除">✖</button>
       `;
       li.querySelector('.name').addEventListener('click', ()=> selectIndex(i));
       li.querySelector('[data-act="play"]').addEventListener('click', ()=>{ selectIndex(i); play(); });
       li.querySelector('[data-act="remove"]').addEventListener('click', ()=>{ removeAt(i); });
+      
       // drag reorder
-      li.addEventListener('dragstart', (e)=>{
-        e.dataTransfer.setData('text/plain', String(i));
-        e.dataTransfer.effectAllowed = 'move';
-      });
-      li.addEventListener('dragover', (e)=>{ e.preventDefault(); e.dataTransfer.dropEffect='move'; });
-      li.addEventListener('drop', (e)=>{
-        e.preventDefault();
-        const from = Number(e.dataTransfer.getData('text/plain'));
-        const to = Number(li.dataset.index);
-        moveItem(from, to);
-      });
+      if(li.draggable){
+        li.addEventListener('dragstart', (e)=>{
+          e.dataTransfer.setData('text/plain', String(i));
+          e.dataTransfer.effectAllowed = 'move';
+        });
+        li.addEventListener('dragover', (e)=>{ e.preventDefault(); e.dataTransfer.dropEffect='move'; });
+        li.addEventListener('drop', (e)=>{
+          e.preventDefault();
+          const from = Number(e.dataTransfer.getData('text/plain'));
+          const to = Number(li.dataset.index);
+          moveItem(from, to);
+        });
+      }
+      
       playlistEl.appendChild(li);
     });
     countBadge.textContent = `${state.tracks.length} 曲`;
   }
 
-  function renderBgmPlaylist(){
-    const q = state.bgmFilter.trim().toLowerCase();
-    bgmPlaylistEl.innerHTML = '';
-    state.bgmTracks.forEach((t, i) => {
-      if(q && !t.name.toLowerCase().includes(q)) return;
-      const li = document.createElement('li');
-      li.draggable = true;
-      li.dataset.index = String(i);
-      if(i === state.currentBgmIndex) li.classList.add('bgm-active');
-      li.innerHTML = `
-        <span class="badge drag" title="ドラッグで並び替え">↕</span>
-        <span class="name" title="タップでBGM選択">${t.name}</span>
-        <button class="btn small purple" data-act="play">▶</button>
-        <button class="btn small" data-act="remove" title="削除">✖</button>
-      `;
-      li.querySelector('.name').addEventListener('click', ()=> selectBgmIndex(i));
-      li.querySelector('[data-act="play"]').addEventListener('click', ()=>{ selectBgmIndex(i); playBgm(); });
-      li.querySelector('[data-act="remove"]').addEventListener('click', ()=>{ removeBgmAt(i); });
-      // drag reorder
-      li.addEventListener('dragstart', (e)=>{
-        e.dataTransfer.setData('text/plain', String(i));
-        e.dataTransfer.effectAllowed = 'move';
-      });
-      li.addEventListener('dragover', (e)=>{ e.preventDefault(); e.dataTransfer.dropEffect='move'; });
-      li.addEventListener('drop', (e)=>{
-        e.preventDefault();
-        const from = Number(e.dataTransfer.getData('text/plain'));
-        const to = Number(li.dataset.index);
-        moveBgmItem(from, to);
-      });
-      bgmPlaylistEl.appendChild(li);
-    });
-    bgmCountBadge.textContent = `${state.bgmTracks.length} 曲`;
-  }
-
   function moveItem(from, to){
-    if(from === to) return;
+    if(from===to) return;
     const item = state.tracks.splice(from,1)[0];
     state.tracks.splice(to,0,item);
-    if(state.currentIndex === from) state.currentIndex = to;
+    if(state.currentIndex===from) state.currentIndex = to;
     else if(from < state.currentIndex && to >= state.currentIndex) state.currentIndex--; 
     else if(from > state.currentIndex && to <= state.currentIndex) state.currentIndex++;
     renderPlaylist();
-  }
-
-  function moveBgmItem(from, to){
-    if(from === to) return;
-    const item = state.bgmTracks.splice(from,1)[0];
-    state.bgmTracks.splice(to,0,item);
-    if(state.currentBgmIndex === from) state.currentBgmIndex = to;
-    else if(from < state.currentBgmIndex && to >= state.currentBgmIndex) state.currentBgmIndex--; 
-    else if(from > state.currentBgmIndex && to <= state.currentBgmIndex) state.currentBgmIndex++;
-    renderBgmPlaylist();
+    saveConfig();
   }
 
   function selectIndex(idx){
@@ -561,457 +648,408 @@
     audio.load();
     inTimeEl.textContent = tr.cueIn!=null ? formatTime(tr.cueIn) : '—';
     outTimeEl.textContent = tr.cueOut!=null ? formatTime(tr.cueOut) : '—';
-    if(old !== idx){ pause(); }
-  }
-
-  function selectBgmIndex(idx){
-    state.currentBgmIndex = idx;
-    renderBgmPlaylist();
-    const tr = state.bgmTracks[idx];
-    if(!tr) return;
-    bgmTitle.textContent = 'BGM: ' + tr.name;
-    bgm.src = tr.url;
-    bgm.load();
+    setMainVol(tr.volume); // 曲固有の音量を復元
+    if(old!==idx){ pause(); }
+    saveConfig(); // 選択曲の保存
   }
 
   function removeAt(i){
-    const [removed] = state.tracks.splice(i,1);
-    try{ if(removed.kind==='local' && removed.url.startsWith('blob:')) URL.revokeObjectURL(removed.url);}catch{}
-    if(state.currentIndex === i){ pause(); audio.src=''; state.currentIndex = Math.min(i, state.tracks.length-1); }
+    const removed = state.tracks[i];
+    if(removed.type === 'static' && !confirm('静的リストの曲を一時的に非表示にします。よろしいですか？')) return;
+
+    state.tracks.splice(i,1);
+    // ローカルファイル (blob) の解放
+    try{ if(removed.type==='local' && removed.url.startsWith('blob:')) URL.revokeObjectURL(removed.url);}catch{}
+    
+    if(state.currentIndex===i){ pause(); audio.src=''; state.currentIndex = Math.min(i, state.tracks.length-1); }
     else if(i < state.currentIndex) state.currentIndex--;
+    
     renderPlaylist();
-    saveUrls();
+    saveConfig();
   }
 
-  function removeBgmAt(i){
-    const [removed] = state.bgmTracks.splice(i,1);
-    try{ if(removed.kind==='local' && removed.url.startsWith('blob:')) URL.revokeObjectURL(removed.url);}catch{}
-    if(state.currentBgmIndex === i){ bgm.pause(); bgm.src=''; state.currentBgmIndex = Math.min(i, state.bgmTracks.length-1); }
-    else if(i < state.currentBgmIndex) state.currentBgmIndex--;
-    renderBgmPlaylist();
-    saveBgmUrls();
-  }
-
+  // ===== File/URL (Updated for ID management and saveConfig) =====
   function addFiles(files){
     const arr = Array.from(files || []);
     arr.forEach(f => {
       const url = URL.createObjectURL(f);
-      state.tracks.push({id:crypto.randomUUID(), name:f.name, url, kind:'local', cueIn:null, cueOut:null});
+      state.tracks.push({
+        id: crypto.randomUUID(), 
+        name: f.name, 
+        url, 
+        type:'local', // local: ブラウザセッション限り
+        cueIn:null, 
+        cueOut:null, 
+        volume: Number(volumeSlider.value) // 現在の音量を初期値とする
+      });
     });
-    if(state.currentIndex < 0 && state.tracks.length) selectIndex(0);
-    else renderPlaylist();
+    if(state.currentIndex<0 && state.tracks.length) selectIndex(0); else renderPlaylist();
+    // localファイルは保存しないが、currentIndexの変更を保存するため呼ぶ
+    saveConfig(); 
   }
-
-  function addBgmFiles(files){
-    const arr = Array.from(files || []);
-    arr.forEach(f => {
-      const url = URL.createObjectURL(f);
-      state.bgmTracks.push({id:crypto.randomUUID(), name:f.name, url, kind:'local'});
-    });
-    if(state.currentBgmIndex < 0 && state.bgmTracks.length) selectBgmIndex(0);
-    else renderBgmPlaylist();
-  }
-
   function addUrlPrompt(){
     const url = prompt('音源URLを貼り付け (mp3, wav 等 / CORS許可が必要な場合あり)');
     if(!url) return;
     const name = prompt('曲名 (省略可)') || url.split('/').pop();
-    state.tracks.push({id:crypto.randomUUID(), name, url, kind:'url', cueIn:null, cueOut:null});
-    if(state.currentIndex < 0) selectIndex(0);
-    else renderPlaylist();
-    saveUrls();
+    state.tracks.push({
+      id: crypto.randomUUID(), 
+      name, 
+      url, 
+      type:'url', // url: 保存される
+      cueIn:null, 
+      cueOut:null, 
+      volume: Number(volumeSlider.value) // 現在の音量を初期値とする
+    });
+    if(state.currentIndex<0) selectIndex(0); else renderPlaylist();
+    saveConfig();
   }
 
-  function addBgmUrlPrompt(){
-    const url = prompt('BGM URLを貼り付け (mp3, wav 等 / CORS許可が必要な場合あり)');
-    if(!url) return;
-    const name = prompt('BGM名 (省略可)') || url.split('/').pop();
-    state.bgmTracks.push({id:crypto.randomUUID(), name, url, kind:'url'});
-    if(state.currentBgmIndex < 0) selectBgmIndex(0);
-    else renderBgmPlaylist();
-    saveBgmUrls();
-  }
-
-  function saveUrls(){
-    const urls = state.tracks.filter(t=>t.kind==='url').map(t=>({name:t.name, url:t.url, cueIn:t.cueIn, cueOut:t.cueOut}));
-    localStorage.setItem('soundboard.urls', JSON.stringify(urls));
-  }
-
-  function saveBgmUrls(){
-    const urls = state.bgmTracks.filter(t=>t.kind==='url').map(t=>({name:t.name, url:t.url}));
-    localStorage.setItem('soundboard.bgmUrls', JSON.stringify(urls));
-  }
-
-  function restoreUrls(){
-    try{
-      const raw = localStorage.getItem('soundboard.urls');
-      if(raw){
-        const urls = JSON.parse(raw);
-        urls.forEach(u=> state.tracks.push({id:crypto.randomUUID(), name:u.name, url:u.url, kind:'url', cueIn:u.cueIn ?? null, cueOut:u.cueOut ?? null}));
-        if(state.tracks.length) selectIndex(0);
-      }
-    }catch{}
-  }
-
-  function restoreBgmUrls(){
-    try{
-      const raw = localStorage.getItem('soundboard.bgmUrls');
-      if(raw){
-        const urls = JSON.parse(raw);
-        urls.forEach(u=> state.bgmTracks.push({id:crypto.randomUUID(), name:u.name, url:u.url, kind:'url'}));
-        if(state.bgmTracks.length) selectBgmIndex(0);
-      }
-    }catch{}
-  }
-
-  // ===== Main Audio Controls =====
+  // ===== Main transport (Update to use stored volume) =====
   async function play(){
     ensureCtx();
     await ctx.resume();
-    if(startFromZero.checked) rampGain(mainGain, 0, 0);
+    // 曲固有の音量を設定
     const tr = state.tracks[state.currentIndex];
-    if(tr && tr.cueIn != null && playFromIn.checked){
-      audio.currentTime = tr.cueIn;
-    }
-    // Duck BGM if enabled
-    if(state.duck.enable && !bgm.paused){
+    if(tr) setMainVol(tr.volume, { skipSave: true }); 
+    if(startFromZero.checked) rampGain(mainGain, 0, 0);
+
+    if(tr && tr.cueIn!=null && playFromIn.checked){ audio.currentTime = tr.cueIn; }
+    // Duck BGM
+    if(duckEnable.checked){
       state.duck.prevVol = bgmGain.gain.value;
-      rampGain(bgmGain, (Number(duckTarget.value)/100), Number(duckSec.value));
+      rampGain(bgmGain, Number(duckTarget.value)/100, Number(duckSec.value));
     }
     try{
       await audio.play();
-      playPauseBtn.textContent = '⏸ 一時停止';
+      playPauseBtn.textContent = '⏸️ 一時停止';
       playPauseBtn.classList.remove('primary');
-    }catch(err){
-      alert('再生できませんでした: ' + err.message);
-    }
+    }catch(err){ alert('再生できませんでした: ' + err.message); }
   }
-
   function pause(){
     audio.pause();
-    playPauseBtn.textContent = '▶ 再生';
+    playPauseBtn.textContent = '▶️ 再生';
     playPauseBtn.classList.add('primary');
-    // un-duck
-    if(state.duck.enable && !bgm.paused){
-      rampGain(bgmGain, state.duck.prevVol, 0.8);
-    }
+    if(duckEnable.checked){ rampGain(bgmGain, state.duck.prevVol, Number(unduckSec.value)); }
   }
-
   function stop(){
-    audio.pause();
-    audio.currentTime = 0;
-    playPauseBtn.textContent = '▶ 再生';
-    playPauseBtn.classList.add('primary');
-    if(state.duck.enable && !bgm.paused){
-      rampGain(bgmGain, state.duck.prevVol, 0.8);
-    }
+    audio.pause(); audio.currentTime = 0;
+    playPauseBtn.textContent='▶️ 再生'; playPauseBtn.classList.add('primary');
+    if(duckEnable.checked){ rampGain(bgmGain, state.duck.prevVol, Number(unduckSec.value)); }
   }
-
   function fadeMainTo(target, sec, {stopAfter=false}={}){
-    ensureCtx();
-    const t = Math.max(0, Number(sec)||0);
-    rampGain(mainGain, target, t);
-    if(stopAfter && target <= 0.0005){
-      setTimeout(()=>{
-        audio.pause();
-        audio.currentTime = 0;
-        playPauseBtn.textContent = '▶ 再生';
-        playPauseBtn.classList.add('primary');
-        if(state.duck.enable && !bgm.paused){
-          rampGain(bgmGain, state.duck.prevVol, 0.8);
-        }
-      }, t * 1000 + 20);
+    rampGain(mainGain, target, Number(sec)||0);
+    if(stopAfter && target<=0.0005){
+      setTimeout(()=>{ stop(); }, (Number(sec)||0)*1000 + 20);
     }
   }
-
-  // ===== BGM Audio Controls =====
-  async function playBgm(){
-    ensureCtx();
-    await ctx.resume();
-    try{
-      await bgm.play();
-      bgmPlayBtn.textContent = '⏸ 停止';
-      bgmPlayBtn.classList.remove('purple');
-    }catch(err){
-      alert('BGM再生できませんでした: ' + err.message);
-    }
+  // ... (中略: Main meters & progress)
+  function updMainTime(){
+    const d = audio.duration||0, c = audio.currentTime||0;
+    elapsedEl.textContent = formatTime(c);
+    durationEl.textContent = formatTime(d);
+    remainingEl.textContent = formatTime(Math.max(0, d-c));
+    progressBar.style.width = `${d ? (c/d*100) : 0}%`;
   }
-
-  function pauseBgm(){
-    bgm.pause();
-    bgmPlayBtn.textContent = '▶ 再生';
-    bgmPlayBtn.classList.add('purple');
+  function updLevel(){
+    if(!analyser) return;
+    analyser.getByteTimeDomainData(dataArray);
+    let sum = 0; for(let i=0;i<dataArray.length;i++){ const v=(dataArray[i]-128)/128; sum+=v*v; }
+    const rms=Math.sqrt(sum/dataArray.length)||1e-7, db=20*Math.log10(rms);
+    levelMeter.value = Math.max(-60, Math.min(0, db));
+    levelDb.textContent = (db<=-59?'-∞':db.toFixed(1)) + ' dB';
   }
-
-  function fadeBgmTo(target, sec){
-    ensureCtx();
-    const t = Math.max(0, Number(sec)||0);
-    rampGain(bgmGain, target, t);
-  }
-
-  // ===== Time / Level Updates =====
-  function updateTime(){
-    const dur = audio.duration || 0;
-    const cur = audio.currentTime || 0;
-    elapsedEl.textContent = formatTime(cur);
-    durationEl.textContent = formatTime(dur);
-    remainingEl.textContent = formatTime(Math.max(0, dur - cur));
-    progressBar.style.width = `${dur ? (cur/dur*100) : 0}%`;
-
-    const bgmDur = bgm.duration || 0;
-    const bgmCur = bgm.currentTime || 0;
-    bgmElapsedEl.textContent = formatTime(bgmCur);
-    bgmDurationEl.textContent = formatTime(bgmDur);
-    bgmProgressBar.style.width = `${bgmDur ? (bgmCur/bgmDur*100) : 0}%`;
-  }
-
-  function updateLevel(){
-    // Main level
-    const mainDb = calculateLevel(mainAnalyser, mainDataArray);
-    levelMeter.value = Math.max(-60, Math.min(0, mainDb));
-    levelDb.textContent = (mainDb <= -59 ? '-∞' : mainDb.toFixed(1)) + ' dB';
-
-    // BGM level
-    const bgmDb = calculateLevel(bgmAnalyser, bgmDataArray);
-    bgmLevel.value = Math.max(-60, Math.min(0, bgmDb));
-    bgmLevelDb.textContent = (bgmDb <= -59 ? '-∞' : bgmDb.toFixed(1)) + ' dB';
-  }
-
   function checkCueOutAutoStop(){
     const tr = state.tracks[state.currentIndex];
     if(!tr) return;
-    if(autoStopAtOut.checked && tr.cueOut != null){
-      const remain = tr.cueOut - audio.currentTime;
+    if(autoStopAtOut.checked && tr.cueOut!=null){
+      const remain = tr.cueOut - (audio.currentTime||0);
       if(remain <= 0){ stop(); }
       else if(remain > 0 && remain < 0.25){
         const sec = Math.max(0.15, Number(fadeOutSec.value)||0.15);
-        fadeMainTo(0, Math.min(sec, remain + 0.05), {stopAfter:true});
+        fadeMainTo(0, Math.min(sec, remain+0.05), {stopAfter:true});
       }
     }
   }
+  let rafId=null;
+  function loop(){ updMainTime(); updLevel(); checkCueOutAutoStop(); checkBgmCueAutoStop(); rafId=requestAnimationFrame(loop); }
 
-  let rafId = null;
-  function loop(){
-    updateTime();
-    updateLevel();
-    checkCueOutAutoStop();
-    rafId = requestAnimationFrame(loop);
-  }
-  function startLoop(){ if(rafId) cancelAnimationFrame(rafId); rafId = requestAnimationFrame(loop); }
-  function stopLoop(){ if(rafId) cancelAnimationFrame(rafId); rafId = null; }
-
-  // ===== Volume Controls =====
-  function setMainVol(v){
-    ensureCtx();
-    const val = clamp01(v);
-    mainGain.gain.value = val;
-    volumeSlider.value = String(val);
-    volNum.value = String(Math.round(val * 100));
-  }
-
-  function setBgmVol(v){
-    ensureCtx();
-    const val = clamp01(v);
-    bgmGain.gain.value = val;
-    bgmVolume.value = String(val);
-    bgmVolNum.value = String(Math.round(val * 100));
-  }
-
-  // ===== Event Listeners =====
-
-  // Tab switching
-  $('.tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      const tabName = tab.dataset.tab;
-      $('.tab').forEach(t => t.classList.remove('active'));
-      $('.tab-content').forEach(c => c.classList.remove('active'));
-      tab.classList.add('active');
-      $(`[data-content="${tabName}"]`).classList.add('active');
-      state.activeTab = tabName;
-    });
-  });
-
-  // Main transport
-  playPauseBtn.addEventListener('click', ()=> audio.paused ? play() : pause());
+  // ===== Main events (Update to save config on relevant actions) =====
+  playPauseBtn.addEventListener('click', ()=> audio.paused ? play() : pause() );
   stopBtn.addEventListener('click', stop);
   seekBackBtn.addEventListener('click', ()=>{ audio.currentTime = Math.max(0, (audio.currentTime||0) - 5); });
-  seekFwdBtn.addEventListener('click', ()=>{ const d = audio.duration||0; audio.currentTime = Math.min(d, (audio.currentTime||0) + 5); });
-  prevBtn.addEventListener('click', ()=>{ const p = state.currentIndex - 1; if(state.tracks[p]){ selectIndex(p); play(); } });
-  nextBtn.addEventListener('click', ()=>{ const n = state.currentIndex + 1; if(state.tracks[n]){ selectIndex(n); play(); } });
+  seekFwdBtn.addEventListener('click', ()=>{ const d=audio.duration||0; audio.currentTime = Math.min(d, (audio.currentTime||0) + 5); });
 
-  // Main fade controls
+  prevBtn.addEventListener('click', ()=>{ const prev = state.currentIndex - 1; if(state.tracks[prev]) selectIndex(prev); });
+  nextBtn.addEventListener('click', ()=>{ const next = state.currentIndex + 1; if(state.tracks[next]) selectIndex(next); });
+
+
   fadeInBtn.addEventListener('click', ()=>{
     if(audio.paused) play();
-    const sec = Number(fadeInSec.value) || 0;
     if(startFromZero.checked) rampGain(mainGain, 0, 0);
-    rampGain(mainGain, 1, sec);
+    rampGain(mainGain, 1, Number(fadeInSec.value)||0);
   });
-  fadeOutBtn.addEventListener('click', ()=> fadeMainTo(0, Number(fadeOutSec.value) || 0));
-  fadeStopBtn.addEventListener('click', ()=> fadeMainTo(0, Number(fadeOutSec.value) || 0, {stopAfter:true}));
+  fadeOutBtn.addEventListener('click', ()=> fadeMainTo(0, Number(fadeOutSec.value)||0) );
+  fadeStopBtn.addEventListener('click', ()=> fadeMainTo(0, Number(fadeOutSec.value)||0, {stopAfter:true}) );
 
-  // Main volume controls
-  volumeSlider.addEventListener('input', ()=> setMainVol(Number(volumeSlider.value)));
-  volNum.addEventListener('input', ()=> setMainVol(Number(volNum.value) / 100));
-  volDown.addEventListener('click', ()=> setMainVol((mainGain?.gain.value || 1) - 0.05));
-  volUp.addEventListener('click', ()=> setMainVol((mainGain?.gain.value || 1) + 0.05));
-  muteBtn.addEventListener('click', ()=> setMainVol((mainGain?.gain.value || 1) > 0 ? 0 : 1));
-
-  // BGM controls
-  bgmPlayBtn.addEventListener('click', ()=> bgm.paused ? playBgm() : pauseBgm());
-  bgmPauseBtn.addEventListener('click', pauseBgm);
-  bgmFadeInBtn.addEventListener('click', ()=> {
-    if(bgm.paused) playBgm();
-    fadeBgmTo(bgmGain?.gain.value > 0 ? bgmGain.gain.value : 0.5, Number(bgmFadeInSec.value) || 0);
-  });
-  bgmFadeOutBtn.addEventListener('click', ()=> fadeBgmTo(0, Number(bgmFadeOutSec.value) || 0));
-
-  // BGM volume controls
-  bgmVolume.addEventListener('input', ()=> setBgmVol(Number(bgmVolume.value)));
-  bgmVolNum.addEventListener('input', ()=> setBgmVol(Number(bgmVolNum.value) / 100));
-  bgmVolDown.addEventListener('click', ()=> setBgmVol((bgmGain?.gain.value || 0.5) - 0.05));
-  bgmVolUp.addEventListener('click', ()=> setBgmVol((bgmGain?.gain.value || 0.5) + 0.05));
-  bgmMuteBtn.addEventListener('click', ()=> setBgmVol((bgmGain?.gain.value || 0.5) > 0 ? 0 : 1));
-
-  bgmLoop.addEventListener('change', ()=> bgm.loop = bgmLoop.checked);
-
-  // Progress seeking
   progress.addEventListener('click', (e)=>{
-    const rect = progress.getBoundingClientRect();
-    const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+    const r = progress.getBoundingClientRect();
+    const ratio = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
     if(isFinite(audio.duration)) audio.currentTime = ratio * audio.duration;
   });
 
-  bgmProgress.addEventListener('click', (e)=>{
-    const rect = bgmProgress.getBoundingClientRect();
-    const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-    if(isFinite(bgm.duration)) bgm.currentTime = ratio * bgm.duration;
-  });
+  volumeSlider.addEventListener('input', ()=> setMainVol(Number(volumeSlider.value)) );
+  volNum.addEventListener('input', ()=> setMainVolByPercent(Number(volNum.value)) );
+  volDown.addEventListener('click', ()=> setMainVol((mainGain?.gain.value||1)-0.05));
+  volUp.addEventListener('click', ()=> setMainVol((mainGain?.gain.value||1)+0.05));
+  muteBtn.addEventListener('click', ()=> setMainVol((mainGain?.gain.value||1)>0 ? 0 : 1) );
 
-  // Cue controls
-  setInBtn.addEventListener('click', ()=>{
-    const tr = state.tracks[state.currentIndex];
-    if(!tr) return;
-    tr.cueIn = Math.floor(audio.currentTime);
-    inTimeEl.textContent = formatTime(tr.cueIn);
-    saveUrls();
-  });
-  setOutBtn.addEventListener('click', ()=>{
-    const tr = state.tracks[state.currentIndex];
-    if(!tr) return;
-    tr.cueOut = Math.floor(audio.currentTime);
-    outTimeEl.textContent = formatTime(tr.cueOut);
-    saveUrls();
-  });
-  goInBtn.addEventListener('click', ()=>{
-    const tr = state.tracks[state.currentIndex];
-    if(tr && tr.cueIn != null){ audio.currentTime = tr.cueIn; }
-  });
-  clearCueBtn.addEventListener('click', ()=>{
-    const tr = state.tracks[state.currentIndex];
-    if(!tr) return;
-    tr.cueIn = null;
-    tr.cueOut = null;
-    inTimeEl.textContent = '—';
-    outTimeEl.textContent = '—';
-    saveUrls();
-  });
+  setInBtn.addEventListener('click', ()=>{ const tr = state.tracks[state.currentIndex]; if(!tr) return; tr.cueIn=Math.floor(audio.currentTime||0); inTimeEl.textContent=formatTime(tr.cueIn); renderPlaylist(); saveConfig(); });
+  setOutBtn.addEventListener('click', ()=>{ const tr = state.tracks[state.currentIndex]; if(!tr) return; tr.cueOut=Math.floor(audio.currentTime||0); outTimeEl.textContent=formatTime(tr.cueOut); renderPlaylist(); saveConfig(); });
+  goInBtn.addEventListener('click', ()=>{ const tr = state.tracks[state.currentIndex]; if(tr && tr.cueIn!=null){ audio.currentTime = tr.cueIn; }});
+  clearCueBtn.addEventListener('click', ()=>{ const tr = state.tracks[state.currentIndex]; if(!tr) return; tr.cueIn=null; tr.cueOut=null; inTimeEl.textContent='—'; outTimeEl.textContent='—'; renderPlaylist(); saveConfig(); });
 
-  // File/URL management
-  addFilesBtn.addEventListener('click', ()=> fileInput.click());
-  fileInput.addEventListener('change', (e)=> addFiles(e.target.files));
-  addUrlBtn.addEventListener('click', addUrlPrompt);
-  clearListBtn.addEventListener('click', ()=>{
-    state.tracks.forEach(t=>{ if(t.kind==='local' && t.url.startsWith('blob:')) try{URL.revokeObjectURL(t.url);}catch{} });
-    state.tracks.length = 0;
-    state.currentIndex = -1;
-    audio.src = '';
-    renderPlaylist();
-    saveUrls();
-  });
-
-  bgmAddFilesBtn.addEventListener('click', ()=> bgmFileInput.click());
-  bgmFileInput.addEventListener('change', (e)=> addBgmFiles(e.target.files));
-  bgmAddUrlBtn.addEventListener('click', addBgmUrlPrompt);
-  bgmClearListBtn.addEventListener('click', ()=>{
-    state.bgmTracks.forEach(t=>{ if(t.kind==='local' && t.url.startsWith('blob:')) try{URL.revokeObjectURL(t.url);}catch{} });
-    state.bgmTracks.length = 0;
-    state.currentBgmIndex = -1;
-    bgm.src = '';
-    renderBgmPlaylist();
-    saveBgmUrls();
-  });
-
-  // Drop zones
-  dropzone.addEventListener('dragover', (e)=>{ e.preventDefault(); dropzone.classList.add('dragging'); });
-  dropzone.addEventListener('dragleave', ()=> dropzone.classList.remove('dragging'));
-  dropzone.addEventListener('drop', (e)=>{ e.preventDefault(); dropzone.classList.remove('dragging'); addFiles(e.dataTransfer.files); });
-
-  bgmDropzone.addEventListener('dragover', (e)=>{ e.preventDefault(); bgmDropzone.classList.add('dragging'); });
-  bgmDropzone.addEventListener('dragleave', ()=> bgmDropzone.classList.remove('dragging'));
-  bgmDropzone.addEventListener('drop', (e)=>{ e.preventDefault(); bgmDropzone.classList.remove('dragging'); addBgmFiles(e.dataTransfer.files); });
-
-  // Search
-  search.addEventListener('input', ()=>{ state.filter = search.value; renderPlaylist(); });
-  bgmSearch.addEventListener('input', ()=>{ state.bgmFilter = bgmSearch.value; renderBgmPlaylist(); });
-
-  // Duck controls
-  duckEnable.addEventListener('change', ()=> state.duck.enable = duckEnable.checked);
-
-  // Audio events
-  audio.addEventListener('play', startLoop);
-  audio.addEventListener('pause', stopLoop);
-  audio.addEventListener('timeupdate', updateTime);
-  audio.addEventListener('loadedmetadata', updateTime);
+  audio.addEventListener('play', ()=>{ if(rafId) cancelAnimationFrame(rafId); rafId=requestAnimationFrame(loop); });
+  audio.addEventListener('pause', ()=>{ if(rafId) cancelAnimationFrame(rafId); rafId=null; });
+  audio.addEventListener('loadedmetadata', updMainTime);
+  audio.addEventListener('timeupdate', updMainTime);
   audio.addEventListener('ended', ()=>{
     if(autoAdvance.checked){
       const next = state.currentIndex + 1;
       if(state.tracks[next]){ selectIndex(next); play(); }
       else { stop(); }
-    } else {
-      stop();
-    }
+    }else{ stop(); }
   });
 
-  bgm.addEventListener('timeupdate', updateTime);
-  bgm.addEventListener('loadedmetadata', updateTime);
+  // ===== Volume binding (Main) (Update to save config) =====
+  function setMainVol(v, { skipSave=false } = {}){
+    ensureCtx();
+    const val = clamp01(v);
+    mainGain.gain.value = val;
+    volumeSlider.value = String(val);
+    volNum.value = String(Math.round(val*100));
+    // 選択中の曲にも音量を記録
+    const tr = state.tracks[state.currentIndex];
+    if(tr){ tr.volume = val; }
+    if(!skipSave) saveConfig();
+  }
+  function setMainVolByPercent(p){
+    setMainVol((Math.max(0, Math.min(100, Number(p)))||0)/100);
+  }
 
-  // Wake Lock
+  // ===== BGM controls (Update to save config) =====
+  function setBgmVol(v, { skipSave=false } = {}){
+    ensureCtx();
+    const val = clamp01(v);
+    bgmGain.gain.value = val;
+    bgmVolume.value = String(val);
+    bgmVolNum.value = String(Math.round(val*100));
+    // BGMトラックにも音量を記録
+    if(state.bgmTrack){ state.bgmTrack.volume = val; }
+    if(!skipSave) saveConfig();
+  }
+  function setBgmVolByPercent(p){ setBgmVol((Math.max(0, Math.min(100, Number(p)))||0)/100); }
+
+  async function bgmPlay(){
+    ensureCtx();
+    await ctx.resume();
+    // BGM固有の音量を設定
+    if(state.bgmTrack) setBgmVol(state.bgmTrack.volume, { skipSave: true }); 
+
+    if(bgmStartFromZero.checked) rampGain(bgmGain, 0, 0);
+    if(state.bgmTrack && state.bgmTrack.cueIn!=null) bgm.currentTime = state.bgmTrack.cueIn;
+    try{ await bgm.play(); }catch(e){ alert('BGM再生失敗: '+e.message); }
+  }
+  function bgmPause(){ bgm.pause(); }
+  function bgmStop(){ bgm.pause(); bgm.currentTime = 0; }
+
+  function bgmFadeTo(target, sec, {stopAfter=false}={}){
+    rampGain(bgmGain, target, Number(sec)||0);
+    if(stopAfter && target<=0.0005){
+      setTimeout(()=>{ bgmStop(); }, (Number(sec)||0)*1000 + 20);
+    }
+  }
+
+  function updBgmTime(){
+    const d = bgm.duration||0, c = bgm.currentTime||0;
+    bgmElapsedEl.textContent = formatTime(c);
+    bgmDurationEl.textContent = formatTime(d);
+    bgmRemainingEl.textContent = formatTime(Math.max(0, d-c));
+    bgmProgressBar.style.width = `${d ? (c/d*100) : 0}%`;
+  }
+  function checkBgmCueAutoStop(){
+    if(!bgmAutoStopAtOut.checked) return;
+    if(state.bgmTrack.cueOut==null) return;
+    const remain = state.bgmTrack.cueOut - (bgm.currentTime||0);
+    if(remain <= 0){ bgmStop(); }
+    else if(remain > 0 && remain < 0.25){
+      const sec = Math.max(0.15, Number(bgmFadeOutSec.value)||0.15);
+      bgmFadeTo(0, Math.min(sec, remain+0.05), {stopAfter:true});
+    }
+  }
+
+  // Bind BGM UI (Update to save config on relevant actions)
+  bgmAddFile.addEventListener('click', ()=> bgmFileInput.click());
+  bgmFileInput.addEventListener('change', (e)=>{
+    const f = e.target.files?.[0]; if(!f) return;
+    const url = URL.createObjectURL(f);
+    bgm.src = url; bgm.load();
+    bgmTitle.textContent = 'BGM: ' + f.name;
+    // BGMトラックをローカルファイルに一時的に置き換え
+    state.bgmTrack = {
+        id: 'bgm-local-temp',
+        name: f.name,
+        url: url,
+        type: 'local',
+        cueIn: null, cueOut: null, 
+        volume: Number(bgmVolume.value),
+        loop: bgmLoop.checked
+    };
+    // ローカルファイルは保存しないが、UI更新のためsaveConfigを呼ぶ
+    saveConfig(); 
+  });
+  bgmAddUrl.addEventListener('click', ()=>{
+    const url = prompt('BGMのURL (CORS許可が必要な場合あり)');
+    if(!url) return;
+    bgm.src = url; bgm.load();
+    const name = url.split('/').pop() || url;
+    bgmTitle.textContent = 'BGM: ' + name;
+    // BGMトラックをURLに置き換え
+    state.bgmTrack = {
+        id: crypto.randomUUID(),
+        name: name,
+        url: url,
+        type: 'url',
+        cueIn: null, cueOut: null, 
+        volume: Number(bgmVolume.value),
+        loop: bgmLoop.checked
+    };
+    saveConfig();
+  });
+  bgmLoop.addEventListener('change', ()=> { bgm.loop = bgmLoop.checked; saveConfig(); } );
+
+  bgmPlayBtn.addEventListener('click', bgmPlay);
+  bgmPauseBtn.addEventListener('click', bgmPause);
+  bgmStopBtn.addEventListener('click', bgmStop);
+
+  bgmSeekBack.addEventListener('click', ()=>{ bgm.currentTime = Math.max(0, (bgm.currentTime||0) - 5); });
+  bgmSeekFwd.addEventListener('click',  ()=>{ const d=bgm.duration||0; bgm.currentTime = Math.min(d, (bgm.currentTime||0) + 5); });
+
+  bgmFadeInBtn.addEventListener('click', ()=>{ 
+    if(bgm.paused) bgmPlay(); 
+    // BGM音量はstate.bgmTrack.volume (保存された音量) へフェード
+    rampGain(bgmGain, state.bgmTrack.volume, Number(bgmFadeInSec.value)||0); 
+  });
+  bgmFadeOutBtn.addEventListener('click', ()=> bgmFadeTo(0, Number(bgmFadeOutSec.value)||0) );
+  bgmFadeStopBtn.addEventListener('click', ()=> bgmFadeTo(0, Number(bgmFadeOutSec.value)||0, {stopAfter:true}) );
+
+  bgmVolume.addEventListener('input', ()=> setBgmVol(Number(bgmVolume.value)) );
+  bgmVolNum.addEventListener('input', ()=> setBgmVolByPercent(Number(bgmVolNum.value)) );
+  bgmVolDown.addEventListener('click', ()=> setBgmVol((bgmGain?.gain.value||0.5) - 0.05) );
+  bgmVolUp.addEventListener('click', ()=> setBgmVol((bgmGain?.gain.value||0.5) + 0.05) );
+
+  bgmProgress.addEventListener('click', (e)=>{
+    const r = bgmProgress.getBoundingClientRect();
+    const ratio = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+    if(isFinite(bgm.duration)) bgm.currentTime = ratio * bgm.duration;
+  });
+
+  // BGM cues (Update to save config)
+  bgmSetInBtn.addEventListener('click', ()=>{ 
+    const t = state.bgmTrack; if(!t) return; 
+    t.cueIn = Math.floor(bgm.currentTime||0); 
+    bgmInTimeEl.textContent = formatTime(t.cueIn); 
+    saveConfig(); 
+  });
+  bgmSetOutBtn.addEventListener('click', ()=>{ 
+    const t = state.bgmTrack; if(!t) return; 
+    t.cueOut = Math.floor(bgm.currentTime||0); 
+    bgmOutTimeEl.textContent = formatTime(t.cueOut); 
+    saveConfig(); 
+  });
+  bgmGoInBtn.addEventListener('click', ()=>{ if(state.bgmTrack && state.bgmTrack.cueIn!=null){ bgm.currentTime = state.bgmTrack.cueIn; }});
+  bgmClearCueBtn.addEventListener('click', ()=>{ 
+    const t = state.bgmTrack; if(!t) return; 
+    t.cueIn=null; t.cueOut=null; 
+    bgmInTimeEl.textContent='—'; bgmOutTimeEl.textContent='—'; 
+    saveConfig(); 
+  });
+
+  bgm.addEventListener('loadedmetadata', updBgmTime);
+  bgm.addEventListener('timeupdate', updBgmTime);
+
+  // ===== Left panel controls (Update clearList and event binding) =====
+  addFilesBtn.addEventListener('click', ()=> fileInput.click());
+  fileInput.addEventListener('change', (e)=> addFiles(e.target.files));
+  addUrlBtn.addEventListener('click', addUrlPrompt);
+
+  clearListBtn.addEventListener('click', ()=>{
+    if(!confirm('静的リストと保存されたURL以外の、ローカルファイルと一時的なURLトラックを全て消去します。よろしいですか？')) return;
+    
+    // local/urlトラックを削除
+    const initialStaticTracks = state.tracks.filter(t => t.type === 'static');
+    
+    state.tracks.forEach(t=>{ 
+      if(t.type==='local' && t.url.startsWith('blob:')) try{URL.revokeObjectURL(t.url);}catch{} 
+    });
+
+    state.tracks = initialStaticTracks;
+    
+    state.currentIndex = state.tracks.length > 0 ? 0 : -1;
+    if(state.currentIndex < 0) { pause(); audio.src = ''; }
+    
+    renderPlaylist();
+    saveConfig();
+  });
+
+  dropzone.addEventListener('dragover', (e)=>{ e.preventDefault(); dropzone.classList.add('dragging'); });
+  dropzone.addEventListener('dragleave', ()=> dropzone.classList.remove('dragging'));
+  dropzone.addEventListener('drop', (e)=>{ e.preventDefault(); dropzone.classList.remove('dragging'); addFiles(e.dataTransfer.files); });
+  search.addEventListener('input', ()=> renderPlaylist() );
+
+  // 全てのグローバル設定の変更を保存
+  document.querySelectorAll('#right input[type="number"], #right input[type="checkbox"]').forEach(el => {
+    el.addEventListener('change', saveConfig);
+  });
+  
+  // ===== WakeLock / Panic (Update to save config) =====
   async function requestWakeLock(){
     if(!('wakeLock' in navigator)) return;
     try{
       state.wakeLock = await navigator.wakeLock.request('screen');
-      state.wakeLock.addEventListener('release', ()=>{ wakeLockToggle.checked = false; });
+      state.wakeLock.addEventListener('release', ()=>{ wakeLockToggle.checked = false; saveConfig(); });
       wakeLockToggle.checked = true;
     }catch(e){ console.warn('WakeLock failed', e); }
+    saveConfig();
   }
-  function releaseWakeLock(){ try{ state.wakeLock && state.wakeLock.release(); }catch{} finally{ state.wakeLock=null; wakeLockToggle.checked=false; } }
+  function releaseWakeLock(){ try{ state.wakeLock && state.wakeLock.release(); }catch{} finally{ state.wakeLock=null; wakeLockToggle.checked=false; saveConfig(); } }
   wakeLockToggle.addEventListener('change', ()=>{ wakeLockToggle.checked ? requestWakeLock() : releaseWakeLock(); });
   document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && wakeLockToggle.checked) requestWakeLock(); });
 
-  // Panic button
-  panicBtn.addEventListener('click', ()=>{
-    rampGain(mainGain, 0, 0.2);
-    rampGain(bgmGain, 0, 0.2);
-    setTimeout(()=>{
-      audio.pause();
-      audio.currentTime = 0;
-      bgm.pause();
-      playPauseBtn.textContent = '▶ 再生';
-      playPauseBtn.classList.add('primary');
-      bgmPlayBtn.textContent = '▶ 再生';
-      bgmPlayBtn.classList.add('purple');
-    }, 220);
+  panicBtn.addEventListener('click', ()=>{ 
+    rampGain(mainGain, 0, 0.2); 
+    rampGain(bgmGain, 0, 0.2); 
+    setTimeout(()=>{ 
+      audio.pause(); audio.currentTime = 0; 
+      bgm.pause(); 
+      // パニック停止後は音量を元に戻すために保存
+      saveConfig(); 
+    }, 220); 
   });
 
-  // ===== Initialization =====
-  restoreUrls();
-  restoreBgmUrls();
+
+  // ===== Init (Update to restore config) =====
+  restoreConfig(); 
+  
+  ensureCtx(); // GainNode/WebAudioContextの初期化
+  // restoreConfigで設定された値をGainNodeに適用
+  setMainVol(Number(volumeSlider.value), { skipSave: true }); 
+  setBgmVol(Number(bgmVolume.value), { skipSave: true });
+  
   renderPlaylist();
-  renderBgmPlaylist();
-  setMainVol(1);
-  setBgmVol(0.5);
-  bgm.loop = true;
-  startLoop();
+  bgm.loop = bgmLoop.checked;
+
+  // kick UI loop
+  requestAnimationFrame(loop);
 
 })();
 </script>
