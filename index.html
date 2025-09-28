@@ -49,6 +49,29 @@
   .dropzone.dragging{border-color:var(--accent);color:var(--accent);background:#11162a}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+
+  /* 必須: スクロールバーが出ないようにマージンをリセットし、高さ100%を指定 */
+  html, body {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden; /* スクロールバーを非表示にする */
+    font-family: sans-serif;
+  }
+
+  /* コンテンツを格納するコンテナ（ここでは例としてフレックスボックスを使用） */
+  .container {
+    height: 100%;
+    display: flex; /* コンテンツの配置を制御する */
+    flex-direction: column; /* 縦方向に並べる */
+    justify-content: center; /* 垂直方向中央寄せ */
+    align-items: center; /* 水平方向中央寄せ */
+    background-color: #f0f0f0;
+  }
+
+  /* （前回のコードのようにグリッドや特定のレイアウトを使う場合は、.container内で高さを制御してください） */
+
 </style>
 </head>
 <body>
