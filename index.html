@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>学習発表会 音響コントローラ</title>
+<title>学習発表会 音響コントローラ – 改良版</title>
 <style>
   :root{
     --bg:#0f1115; --fg:#e8eaf0; --muted:#aab3c5; --accent:#7aa2ff; --danger:#ff5d5d; --ok:#2ecc71; --panel:#161a22; --btn:#202736; --border:#2a3142; --yellow:#ffd166;
@@ -12,7 +12,7 @@
   body{margin:0;background:var(--bg);color:var(--fg);font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI","Noto Sans JP","Hiragino Kaku Gothic ProN","Meiryo",sans-serif}
   header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border);position:sticky;top:0;background:linear-gradient(180deg,rgba(15,17,21,.97),rgba(15,17,21,.9));backdrop-filter:blur(4px);z-index:10}
   h1{font-size:18px;margin:0;font-weight:800;letter-spacing:.02em}
-  .container{display:grid;grid-template-columns:350px 1fr;gap:12px;padding:12px;min-height:calc(100vh - 56px)}
+  .container{display:grid;grid-template-columns:360px 1fr;gap:12px;padding:12px;min-height:calc(100vh - 56px)}
   @media (max-width: 980px){.container{grid-template-columns:1fr}}
   .panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:12px}
   .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
@@ -22,10 +22,10 @@
   .btn.primary{background:var(--accent);border-color:transparent;color:#0b1020}
   .btn.danger{background:var(--danger);border-color:transparent;color:#0b1020}
   .btn.ok{background:var(--ok);border-color:transparent;color:#0b1020}
-  input[type="number"],input[type="text"],input[type="url"]{background:#0e1220;border:1px solid var(--border);color:var(--fg);border-radius:10px;padding:9px 10px}
+  input[type="number"],input[type="text"],input[type="url"],input[type="password"],textarea{background:#0e1220;border:1px solid var(--border);color:var(--fg);border-radius:10px;padding:9px 10px}
   input[type="range"]{width:100%}
   small.mono{font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;color:var(--muted)}
-  .playlist{list-style:none;padding:0;margin:8px 0 0;max-height:calc(100vh - 240px);overflow:auto}
+  .playlist{list-style:none;padding:0;margin:8px 0 0;max-height:calc(100vh - 320px);overflow:auto}
   .playlist li{display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;background:#121722}
   .playlist li.active{outline:2px solid var(--accent);background:#141a28}
   .playlist li .name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -49,6 +49,9 @@
   .disabled{opacity:.5;pointer-events:none}
   .dropzone{border:2px dashed var(--border);border-radius:12px;padding:16px;text-align:center;color:var(--muted)}
   .dropzone.dragging{border-color:var(--accent);color:var(--accent);background:#11162a}
+  dialog{border:1px solid var(--border);background:var(--panel);color:var(--fg);border-radius:14px;max-width:640px}
+  dialog::backdrop{background:rgba(0,0,0,.6)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 </style>
 </head>
 <body>
@@ -74,9 +77,11 @@
       <input id="fileInput" type="file" accept="audio/*" multiple style="display:none"/>
       <button id="addFiles" class="btn">📁 ファイル追加</button>
       <button id="addUrl" class="btn">🌐 URL追加</button>
+      <button id="importPl" class="btn">📥 インポート</button>
+      <button id="exportPl" class="btn">📤 エクスポート</button>
       <button id="clearList" class="btn" title="URLは保存されます/ローカルは保存されません">🧹 クリア</button>
     </div>
-    <div id="dropzone" class="dropzone" style="margin-top:8px">ここに音声ファイルをドラッグ&ドロップ</div>
+    <div id="dropzone" class="dropzone" style="margin-top:8px">ここに音声ファイルをドラッグ&ドロップ（複数可）</div>
 
     <ul id="playlist" class="playlist" aria-label="Playlist"></ul>
 
@@ -89,7 +94,21 @@
         <input id="playFromIn" type="checkbox" checked>
         <span>INから再生</span>
       </label>
+      <label class="toggle" title="IN-OUTをループ">
+        <input id="loopSection" type="checkbox">
+        <span>区間ループ</span>
+      </label>
     </div>
+
+    <fieldset style="margin-top:8px">
+      <legend>GitHub 連携</legend>
+      <div class="row" style="gap:6px;flex-wrap:wrap">
+        <button id="ghConfigBtn" class="btn">⚙️ 設定</button>
+        <button id="ghUploadBtn" class="btn">⬆️ 選択をアップロード</button>
+        <button id="ghAddFromRepoBtn" class="btn">📚 リポから読み込み</button>
+      </div>
+      <small class="note">※個人アクセストークン(PAT)を使います。トークンは端末の<code>localStorage</code>にのみ保存されます。</small>
+    </fieldset>
   </aside>
 
   <main class="panel" id="right">
@@ -100,7 +119,7 @@
           <div id="title" style="font-size:20px;font-weight:800;max-width:70vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">—</div>
         </div>
         <div class="row">
-          <div style="min-width:140px;text-align:right">
+          <div style="min-width:160px;text-align:right">
             <div class="timer"><span id="elapsed">00:00</span> / <span id="duration">00:00</span></div>
             <div style="text-align:right"><small class="mono">残り <span id="remaining">00:00</span></small></div>
           </div>
@@ -129,7 +148,7 @@
       </div>
 
       <fieldset>
-        <legend>ボリューム</legend>
+        <legend>ボリューム（ソフトリミッタ付）</legend>
         <div class="row" style="align-items:center;gap:12px">
           <input id="volume" type="range" min="0" max="1" step="0.001" value="1" style="flex:1">
           <div style="width:66px;text-align:right"><small class="mono"><span id="volPercent">100</span>%</small></div>
@@ -169,10 +188,49 @@
 </div>
 
 <footer>
-  <small class="note">ローカルの音声ファイルはブラウザ内だけで使われ、外部にアップロードされません。URLで追加した曲のみ保存されます。</small>
+  <small class="note">ローカルの音声ファイルはブラウザ内だけで使われ、外部にアップロードされません（GitHub連携を使った場合のみアップロード可）。URLで追加した曲とキューは保存されます（端末ローカル）。</small>
 </footer>
 
 <audio id="audio" crossorigin="anonymous"></audio>
+
+<!-- GitHub 設定モーダル -->
+<dialog id="ghDialog">
+  <form method="dialog" style="padding:14px;display:grid;gap:10px">
+    <h3 style="margin:0">GitHub 設定</h3>
+    <div class="grid2">
+      <label>所有者/Org
+        <input id="ghOwner" type="text" placeholder="例: yourname" required>
+      </label>
+      <label>リポジトリ名
+        <input id="ghRepo" type="text" placeholder="例: school-audio" required>
+      </label>
+      <label>ブランチ
+        <input id="ghBranch" type="text" value="main" required>
+      </label>
+      <label>アップロード先パス（フォルダ）
+        <input id="ghBasePath" type="text" placeholder="例: assets/audio">
+      </label>
+      <label>個人アクセストークン（repo権限）
+        <input id="ghToken" type="password" placeholder="ghp_xxx" required>
+      </label>
+      <label>生URLの形式
+        <select id="ghRawStyle">
+          <option value="raw">raw.githubusercontent.com</option>
+          <option value="jsdelivr">cdn.jsdelivr.net/gh</option>
+        </select>
+      </label>
+    </div>
+    <div class="row" style="justify-content:space-between">
+      <div>
+        <label class="toggle"><input id="ghRemember" type="checkbox" checked><span>この端末に保存</span></label>
+      </div>
+      <div class="row">
+        <button class="btn" value="cancel">キャンセル</button>
+        <button id="ghSaveBtn" class="btn ok" value="default">保存</button>
+      </div>
+    </div>
+  </form>
+</dialog>
 
 <script>
 (() => {
@@ -180,7 +238,7 @@
   const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
   const audio = $('#audio');
-  let ctx, srcNode, gainNode, analyser, dataArray;
+  let ctx, srcNode, gainNode, analyser, dataArray, compressor;
   let rafId = null;
   let currentIndex = -1;
   let wakeLock = null;
@@ -220,10 +278,13 @@
   const outTimeEl = $('#outTime');
   const autoAdvance = $('#autoAdvance');
   const playFromIn = $('#playFromIn');
+  const loopSection = $('#loopSection');
   const autoStopAtOut = $('#autoStopAtOut');
   const addFilesBtn = $('#addFiles');
   const fileInput = $('#fileInput');
   const addUrlBtn = $('#addUrl');
+  const importPlBtn = $('#importPl');
+  const exportPlBtn = $('#exportPl');
   const clearListBtn = $('#clearList');
   const search = $('#search');
   const dropzone = $('#dropzone');
@@ -232,6 +293,21 @@
   const hotkeys = $('#hotkeys');
   const wakeLockToggle = $('#wakeLockToggle');
 
+  // GitHub UI
+  const ghDialog = $('#ghDialog');
+  const ghOwner = $('#ghOwner');
+  const ghRepo = $('#ghRepo');
+  const ghBranch = $('#ghBranch');
+  const ghBasePath = $('#ghBasePath');
+  const ghToken = $('#ghToken');
+  const ghRawStyle = $('#ghRawStyle');
+  const ghRemember = $('#ghRemember');
+  const ghConfigBtn = $('#ghConfigBtn');
+  const ghUploadBtn = $('#ghUploadBtn');
+  const ghAddFromRepoBtn = $('#ghAddFromRepoBtn');
+
+  const GH_KEY = 'soundboard.github.config.v1';
+
   // ---------- Audio Graph ----------
   function ensureAudioGraph(){
     if(ctx) return;
@@ -239,10 +315,18 @@
     srcNode = ctx.createMediaElementSource(audio);
     gainNode = ctx.createGain();
     gainNode.gain.value = 1;
+    compressor = ctx.createDynamicsCompressor();
+    // 軽いリミッタ設定（急なピークを抑える）
+    compressor.threshold.setValueAtTime(-6, ctx.currentTime);
+    compressor.knee.setValueAtTime(15, ctx.currentTime);
+    compressor.ratio.setValueAtTime(12, ctx.currentTime);
+    compressor.attack.setValueAtTime(0.003, ctx.currentTime);
+    compressor.release.setValueAtTime(0.15, ctx.currentTime);
+
     analyser = ctx.createAnalyser();
     analyser.fftSize = 2048;
     dataArray = new Uint8Array(analyser.frequencyBinCount);
-    srcNode.connect(gainNode).connect(analyser).connect(ctx.destination);
+    srcNode.connect(gainNode).connect(compressor).connect(analyser).connect(ctx.destination);
   }
 
   function formatTime(sec){
@@ -258,7 +342,8 @@
     const cur = audio.currentTime || 0;
     elapsedEl.textContent = formatTime(cur);
     durationEl.textContent = formatTime(dur);
-    remainingEl.textContent = formatTime(Math.max(0, dur - cur));
+    const remain = (state.tracks[currentIndex]?.cueOut ?? dur) - cur;
+    remainingEl.textContent = formatTime(Math.max(0, Math.floor(remain)));
     const ratio = dur ? (cur / dur) : 0;
     progressBar.style.width = `${ratio*100}%`;
   }
@@ -266,12 +351,9 @@
   function updateLevel(){
     if(!analyser) return;
     analyser.getByteTimeDomainData(dataArray);
-    // RMS
     let sum = 0;
     for(let i=0;i<dataArray.length;i++){
-      const v = (dataArray[i]-128)/128;
-      sum += v*v;
-    }
+      const v = (dataArray[i]-128)/128; sum += v*v; }
     const rms = Math.sqrt(sum / dataArray.length) || 0.0000001;
     const db = 20 * Math.log10(rms);
     levelMeter.value = Math.max(-60, Math.min(0, db));
@@ -281,15 +363,10 @@
   function loop(){
     updateTimeUI();
     updateLevel();
-    checkCueOutAutoStop();
+    checkCue();
     rafId = requestAnimationFrame(loop);
   }
-
-  function startRaf(){
-    if(rafId) cancelAnimationFrame(rafId);
-    rafId = requestAnimationFrame(loop);
-  }
-
+  function startRaf(){ if(rafId) cancelAnimationFrame(rafId); rafId = requestAnimationFrame(loop); }
   function stopRaf(){ if(rafId) cancelAnimationFrame(rafId); rafId=null; }
 
   function setGain(value){
@@ -316,39 +393,35 @@
       return;
     }
     gainNode.gain.linearRampToValueAtTime(tgt, now + t);
-    if(stopAfter && tgt<=0.0005){
-      // schedule stop just after ramp
-      setTimeout(()=>{ audio.pause(); audio.currentTime = 0; }, t*1000 + 20);
-    }
+    if(stopAfter && tgt<=0.0005){ setTimeout(()=>{ audio.pause(); audio.currentTime = 0; }, t*1000 + 20); }
   }
 
   async function play(){
     ensureAudioGraph();
     await ctx.resume();
     if(startFromZero.checked) setGain(0);
-    // Jump to IN if set & option enabled
     const tr = state.tracks[currentIndex];
-    if(tr && tr.cueIn!=null && playFromIn.checked){
-      audio.currentTime = tr.cueIn;
-    }
+    if(tr && tr.cueIn!=null && playFromIn.checked){ audio.currentTime = tr.cueIn; }
     try{
       await audio.play();
       playPauseBtn.textContent = '⏸️ 一時停止';
       playPauseBtn.classList.remove('primary');
-    }catch(err){
-      alert('再生できませんでした: ' + err.message);
-    }
+    }catch(err){ alert('再生できませんでした: ' + err.message); }
   }
   function pause(){ audio.pause(); playPauseBtn.textContent = '▶️ 再生'; playPauseBtn.classList.add('primary'); }
   function stop(){ audio.pause(); audio.currentTime = 0; playPauseBtn.textContent='▶️ 再生'; playPauseBtn.classList.add('primary'); }
 
-  function checkCueOutAutoStop(){
-    const tr = state.tracks[currentIndex];
-    if(!tr) return;
-    if(autoStopAtOut.checked && tr.cueOut!=null){
-      const remain = tr.cueOut - audio.currentTime;
+  function checkCue(){
+    const tr = state.tracks[currentIndex]; if(!tr) return;
+    const out = tr.cueOut; const cur = audio.currentTime || 0;
+    if(loopSection.checked && tr.cueIn!=null && tr.cueOut!=null){
+      if(cur >= out){ audio.currentTime = tr.cueIn; }
+      return;
+    }
+    if(autoStopAtOut.checked && out!=null){
+      const remain = out - cur;
       if(remain <= 0){ audio.pause(); audio.currentTime = 0; }
-      else if(remain > 0 && remain < 0.25){ // 少しだけフェード
+      else if(remain > 0 && remain < 0.25){
         const sec = Math.max(0.15, Number(fadeOutSec.value)||0.15);
         fadeTo(0, Math.min(sec, remain+0.05), {stopAfter:true});
       }
@@ -356,14 +429,10 @@
   }
 
   function selectIndex(idx){
-    const old = currentIndex;
-    currentIndex = idx;
-    renderPlaylist();
-    const tr = state.tracks[idx];
-    if(!tr) return;
+    const old = currentIndex; currentIndex = idx; renderPlaylist();
+    const tr = state.tracks[idx]; if(!tr) return;
     titleEl.textContent = tr.name;
-    audio.src = tr.url;
-    audio.load();
+    audio.src = tr.url; audio.preload = 'auto'; audio.load();
     inTimeEl.textContent = tr.cueIn!=null ? formatTime(tr.cueIn) : '—';
     outTimeEl.textContent = tr.cueOut!=null ? formatTime(tr.cueOut) : '—';
     if(old!==idx){ pause(); }
@@ -375,8 +444,7 @@
     state.tracks.forEach((t, i) => {
       if(q && !t.name.toLowerCase().includes(q)) return;
       const li = document.createElement('li');
-      li.draggable = true;
-      li.dataset.index = String(i);
+      li.draggable = true; li.dataset.index = String(i);
       if(i===currentIndex) li.classList.add('active');
       li.innerHTML = `
         <span class="badge drag" title="ドラッグで並び替え">↕</span>
@@ -389,18 +457,9 @@
       li.querySelector('.name').addEventListener('click', ()=> selectIndex(i));
       li.querySelector('[data-act="play"]').addEventListener('click', ()=>{ selectIndex(i); play(); });
       li.querySelector('[data-act="remove"]').addEventListener('click', ()=>{ removeAt(i); });
-      // drag
-      li.addEventListener('dragstart', (e)=>{
-        e.dataTransfer.setData('text/plain', String(i));
-        e.dataTransfer.effectAllowed = 'move';
-      });
+      li.addEventListener('dragstart', (e)=>{ e.dataTransfer.setData('text/plain', String(i)); e.dataTransfer.effectAllowed = 'move'; });
       li.addEventListener('dragover', (e)=>{ e.preventDefault(); e.dataTransfer.dropEffect='move'; });
-      li.addEventListener('drop', (e)=>{
-        e.preventDefault();
-        const from = Number(e.dataTransfer.getData('text/plain'));
-        const to = Number(li.dataset.index);
-        moveItem(from, to);
-      });
+      li.addEventListener('drop', (e)=>{ e.preventDefault(); const from = Number(e.dataTransfer.getData('text/plain')); const to = Number(li.dataset.index); moveItem(from, to); });
       playlistEl.appendChild(li);
     });
     countBadge.textContent = `${state.tracks.length} 曲`;
@@ -421,8 +480,7 @@
     try{ if(removed.kind==='local' && removed.url.startsWith('blob:')) URL.revokeObjectURL(removed.url);}catch{}
     if(currentIndex===i){ pause(); audio.src=''; currentIndex = Math.min(i, state.tracks.length-1); }
     else if(i < currentIndex) currentIndex--;
-    renderPlaylist();
-    saveUrls();
+    renderPlaylist(); saveUrls();
   }
 
   function addFiles(files){
@@ -444,18 +502,38 @@
   }
 
   function saveUrls(){
-    // ローカルファイルは保存不可。URLのみ保存
     const urls = state.tracks.filter(t=>t.kind==='url').map(t=>({name:t.name, url:t.url, cueIn:t.cueIn, cueOut:t.cueOut}));
     localStorage.setItem('soundboard.urls', JSON.stringify(urls));
   }
   function restoreUrls(){
     try{
-      const raw = localStorage.getItem('soundboard.urls');
-      if(!raw) return;
+      const raw = localStorage.getItem('soundboard.urls'); if(!raw) return;
       const urls = JSON.parse(raw);
       urls.forEach(u=> state.tracks.push({id:crypto.randomUUID(), name:u.name, url:u.url, kind:'url', cueIn:u.cueIn ?? null, cueOut:u.cueOut ?? null}));
       if(state.tracks.length) selectIndex(0); else renderPlaylist();
     }catch{}
+  }
+
+  // 追加：プレイリストのJSON入出力（曲名/URL/キュー）
+  function exportPlaylist(){
+    const data = state.tracks.map(t=>({name:t.name, url:t.url, cueIn:t.cueIn, cueOut:t.cueOut}));
+    const blob = new Blob([JSON.stringify({version:1, items:data}, null, 2)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'playlist.json'; a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+  }
+  function importPlaylist(file){
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        const obj = JSON.parse(String(reader.result||'{}'));
+        if(!Array.isArray(obj.items)) throw new Error('不正な形式');
+        obj.items.forEach(it=> state.tracks.push({id:crypto.randomUUID(), name:it.name, url:it.url, kind:'url', cueIn:it.cueIn ?? null, cueOut:it.cueOut ?? null}));
+        if(currentIndex<0) selectIndex(0); else renderPlaylist();
+        saveUrls();
+      }catch(e){ alert('読み込み失敗: '+ e.message); }
+    };
+    reader.readAsText(file);
   }
 
   // ---------- Event wiring ----------
@@ -463,14 +541,15 @@
   fileInput.addEventListener('change', (e)=> addFiles(e.target.files));
   addUrlBtn.addEventListener('click', addUrlPrompt);
   clearListBtn.addEventListener('click', ()=>{
-    // revoke blobs
     state.tracks.forEach(t=>{ if(t.kind==='local' && t.url.startsWith('blob:')) try{URL.revokeObjectURL(t.url);}catch{} });
-    // keep URL items if user wants? ここでは全消し
-    state.tracks.length = 0;
-    currentIndex = -1;
-    audio.src='';
-    renderPlaylist();
+    state.tracks.length = 0; currentIndex = -1; audio.src=''; renderPlaylist(); saveUrls();
   });
+  importPlBtn.addEventListener('click', ()=>{
+    const i = document.createElement('input'); i.type='file'; i.accept='application/json';
+    i.onchange = () => { if(i.files && i.files[0]) importPlaylist(i.files[0]); };
+    i.click();
+  });
+  exportPlBtn.addEventListener('click', exportPlaylist);
 
   dropzone.addEventListener('dragover', (e)=>{ e.preventDefault(); dropzone.classList.add('dragging'); });
   dropzone.addEventListener('dragleave', ()=> dropzone.classList.remove('dragging'));
@@ -481,20 +560,9 @@
   playPauseBtn.addEventListener('click', ()=> audio.paused ? play() : pause());
   stopBtn.addEventListener('click', stop);
 
-  fadeInBtn.addEventListener('click', ()=>{
-    if(audio.paused) play();
-    const sec = Number(fadeInSec.value)||0;
-    if(startFromZero.checked) setGain(0);
-    fadeTo(1, sec);
-  });
-  fadeOutBtn.addEventListener('click', ()=>{
-    const sec = Number(fadeOutSec.value)||0;
-    fadeTo(0, sec);
-  });
-  fadeStopBtn.addEventListener('click', ()=>{
-    const sec = Number(fadeOutSec.value)||0;
-    fadeTo(0, sec, {stopAfter:true});
-  });
+  fadeInBtn.addEventListener('click', ()=>{ if(audio.paused) play(); const sec = Number(fadeInSec.value)||0; if(startFromZero.checked) setGain(0); fadeTo(1, sec); });
+  fadeOutBtn.addEventListener('click', ()=>{ const sec = Number(fadeOutSec.value)||0; fadeTo(0, sec); });
+  fadeStopBtn.addEventListener('click', ()=>{ const sec = Number(fadeOutSec.value)||0; fadeTo(0, sec, {stopAfter:true}); });
 
   volumeSlider.addEventListener('input', ()=> setGain(Number(volumeSlider.value)) );
   muteBtn.addEventListener('click', ()=> setGain(gainNode ? (gainNode.gain.value>0 ? 0 : 1) : (audio.volume>0 ? 0 : 1)) );
@@ -515,24 +583,17 @@
   audio.addEventListener('timeupdate', updateTimeUI);
   audio.addEventListener('loadedmetadata', updateTimeUI);
   audio.addEventListener('ended', ()=>{
-    // 自動で次へ
     if(autoAdvance.checked){
       const next = currentIndex + 1;
       if(state.tracks[next]){ selectIndex(next); play(); }
       else { stop(); }
-    }else{
-      stop();
-    }
+    }else{ stop(); }
   });
 
   // Wake Lock (screen)
   async function requestWakeLock(){
     if(!('wakeLock' in navigator)) return;
-    try{
-      wakeLock = await navigator.wakeLock.request('screen');
-      wakeLock.addEventListener('release', ()=>{ wakeLockToggle.checked = false; });
-      wakeLockToggle.checked = true;
-    }catch(e){ console.warn('WakeLock failed', e); }
+    try{ wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', ()=>{ wakeLockToggle.checked = false; }); wakeLockToggle.checked = true; }catch(e){ console.warn('WakeLock failed', e); }
   }
   function releaseWakeLock(){ try{ wakeLock && wakeLock.release(); }catch{} finally{ wakeLock=null; wakeLockToggle.checked=false; } }
   wakeLockToggle.addEventListener('change', ()=>{ wakeLockToggle.checked ? requestWakeLock() : releaseWakeLock(); });
@@ -544,7 +605,7 @@
   // Hotkey panel toggle
   hotkeyBtn.addEventListener('click', ()=>{ hotkeys.open = !hotkeys.open; });
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts（改良）
   window.addEventListener('keydown', (e)=>{
     if((e.target instanceof HTMLInputElement) || (e.target instanceof HTMLTextAreaElement)) return;
     if(e.code==='Space'){ e.preventDefault(); audio.paused ? play() : pause(); }
@@ -560,6 +621,123 @@
     else if(e.key==='p' || e.key==='P'){ const pv = currentIndex-1; if(state.tracks[pv]){ selectIndex(pv); play(); } }
     else if(e.ctrlKey && (e.key==='l' || e.key==='L')){ e.preventDefault(); addUrlPrompt(); }
     else if(/^[1-9]$/.test(e.key)){ const idx = Number(e.key)-1; if(state.tracks[idx]){ selectIndex(idx); play(); } }
+  });
+
+  // ---------- GitHub integration ----------
+  function loadGhConfig(){
+    try{
+      const raw = localStorage.getItem(GH_KEY); if(!raw) return null;
+      const cfg = JSON.parse(raw);
+      ghOwner.value = cfg.owner||''; ghRepo.value = cfg.repo||''; ghBranch.value = cfg.branch||'main'; ghBasePath.value = cfg.basePath||''; ghRawStyle.value = cfg.rawStyle||'raw';
+      // token は安全のため毎回入力にする派もいるが、希望があれば保存
+      if(cfg.token) ghToken.value = cfg.token;
+      return cfg;
+    }catch{ return null; }
+  }
+  function saveGhConfig(){
+    const cfg = { owner: ghOwner.value.trim(), repo: ghRepo.value.trim(), branch: ghBranch.value.trim()||'main', basePath: ghBasePath.value.trim(), rawStyle: ghRawStyle.value, token: ghRemember.checked ? ghToken.value : '' };
+    localStorage.setItem(GH_KEY, JSON.stringify(cfg));
+    return cfg;
+  }
+  function rawUrl(cfg, path){
+    const clean = path.replace(/^\/+/, '');
+    if(cfg.rawStyle==='jsdelivr') return `https://cdn.jsdelivr.net/gh/${cfg.owner}/${cfg.repo}@${cfg.branch}/${clean}`;
+    return `https://raw.githubusercontent.com/${cfg.owner}/${cfg.repo}/${cfg.branch}/${clean}`;
+  }
+  async function ghGetSha(cfg, path){
+    const url = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(cfg.branch)}`;
+    const res = await fetch(url, {headers: {Authorization: `Bearer ${cfg.token}`, Accept:'application/vnd.github+json'}});
+    if(res.status===404) return null; if(!res.ok) throw new Error('GitHub API 失敗');
+    const json = await res.json(); return json.sha;
+  }
+  async function ghPutFile(cfg, path, contentBase64, message){
+    const body = { message, content: contentBase64, branch: cfg.branch };
+    const existingSha = await ghGetSha(cfg, path);
+    if(existingSha) body.sha = existingSha;
+    const url = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${encodeURIComponent(path)}`;
+    const res = await fetch(url, {method:'PUT', headers:{'Content-Type':'application/json', Authorization:`Bearer ${cfg.token}`, Accept:'application/vnd.github+json'}, body: JSON.stringify(body)});
+    if(!res.ok){ const t = await res.text(); throw new Error('アップロード失敗: '+t); }
+    return res.json();
+  }
+  function toBase64(file){
+    return new Promise((resolve, reject)=>{
+      const fr = new FileReader(); fr.onload = ()=>{
+        const arr = new Uint8Array(fr.result); // ArrayBuffer
+        // btoa は 8bit しか対応しないため、自前で
+        let bin=''; for(let i=0;i<arr.length;i++) bin += String.fromCharCode(arr[i]);
+        resolve(btoa(bin));
+      }; fr.onerror = reject; fr.readAsArrayBuffer(file);
+    });
+  }
+
+  ghConfigBtn.addEventListener('click', ()=>{ loadGhConfig(); ghDialog.showModal(); });
+  $('#ghSaveBtn').addEventListener('click', (e)=>{ e.preventDefault(); saveGhConfig(); ghDialog.close(); });
+
+  ghUploadBtn.addEventListener('click', async ()=>{
+    const cfg = loadGhConfig() || {owner:'',repo:'',branch:'main',basePath:'',rawStyle:'raw',token:''};
+    if(!cfg.owner || !cfg.repo || !cfg.branch || !ghToken.value){ ghDialog.showModal(); alert('先に GitHub 設定を入力して保存してね'); return; }
+    // 対象：プレイリスト中の kind==='local' のファイル（blob URL）を選択アップロード
+    // ユーザーに確認
+    const targets = state.tracks.filter(t=>t.kind==='local');
+    if(targets.length===0){ alert('ローカルファイルが見つからないよ。\n左の「ファイル追加」で曲を入れてから再実行してね。'); return; }
+    if(!confirm(`ローカル曲 ${targets.length}件 を GitHub にアップロードしますか？`)) return;
+
+    // blob URL から元 File を取るには、追加時に File も保存しておく
+  });
+
+  // 追加: File を一緒に保持
+  const _origAddFiles = addFiles;
+  function addFilesWithKeep(files){
+    const arr = Array.from(files || []);
+    arr.forEach(f => {
+      const url = URL.createObjectURL(f);
+      const tr = {id:crypto.randomUUID(), name:f.name, url, kind:'local', cueIn:null, cueOut:null};
+      tr.__file = f; // 非標準プロパティ（保存はしない）
+      state.tracks.push(tr);
+    });
+    if(currentIndex<0 && state.tracks.length) selectIndex(0); else renderPlaylist();
+  }
+  // 上書き
+  addFiles = addFilesWithKeep;
+
+  ghUploadBtn.addEventListener('click', async ()=>{
+    const cfg = loadGhConfig() || {};
+    if(!cfg.owner || !cfg.repo || !cfg.branch || !(cfg.token || ghToken.value)) { ghDialog.showModal(); return; }
+    if(!cfg.token && ghToken.value){ cfg.token = ghToken.value; if(ghRemember.checked) localStorage.setItem(GH_KEY, JSON.stringify(cfg)); }
+
+    const locals = state.tracks.filter(t=>t.kind==='local' && t.__file);
+    if(locals.length===0){ alert('アップロード対象のローカル曲がありません。'); return; }
+
+    try{
+      for(const t of locals){
+        const basePath = cfg.basePath ? cfg.basePath.replace(/\/+$/,'')+'/' : '';
+        const path = basePath + t.name;
+        const b64 = await toBase64(t.__file);
+        await ghPutFile(cfg, path, b64, `Add/Update audio: ${t.name}`);
+        // 成功したらプレイリスト内のURLを生URLに差し替え
+        t.url = rawUrl(cfg, path);
+        t.kind = 'url';
+        delete t.__file;
+      }
+      renderPlaylist(); saveUrls();
+      alert('GitHub へアップロード & URL 置き換え完了！');
+    }catch(e){ alert(String(e.message||e)); }
+  });
+
+  ghAddFromRepoBtn.addEventListener('click', async ()=>{
+    const cfg = loadGhConfig() || {};
+    if(!cfg.owner || !cfg.repo || !cfg.branch){ ghDialog.showModal(); return; }
+    const base = (cfg.basePath||'').replace(/\/+$/,'');
+    const api = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${encodeURIComponent(base)}?ref=${encodeURIComponent(cfg.branch)}`;
+    try{
+      const res = await fetch(api, {headers:{Accept:'application/vnd.github+json'}});
+      if(!res.ok){ alert('一覧取得に失敗'); return; }
+      const list = await res.json();
+      const audios = (Array.isArray(list)?list:[]).filter(x=>/\.(mp3|wav|m4a|ogg|flac)$/i.test(x.name));
+      if(audios.length===0){ alert('音声ファイルが見つからないよ'); return; }
+      audios.forEach(x=> state.tracks.push({id:crypto.randomUUID(), name:x.name, url: rawUrl(cfg, (base?base+'/':'')+x.name), kind:'url', cueIn:null, cueOut:null}));
+      if(currentIndex<0) selectIndex(0); else renderPlaylist(); saveUrls();
+    }catch(e){ alert('エラー: '+ String(e.message||e)); }
   });
 
   // Init
