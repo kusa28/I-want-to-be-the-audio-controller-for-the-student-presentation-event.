@@ -253,9 +253,11 @@
       <details class="panel" open style="background:#121722;margin-top:8px">
         <summary>ℹ️ ヒント</summary>
         <div style="margin-top:6px;color:var(--muted);font-size:14px">
+          ・GitHub Pagesで利用する場合、リポジトリの`audio`フォルダに音声ファイルを入れるだけで自動でプレイリストに追加されます。<br>
+          ・リポジトリは公開設定にしてください。<br>
+          ・各曲のIN/OUT点や音量設定は自動でブラウザに保存されます。<br>
           ・iPad完全タッチ操作OK<br>
           ・BGMはメイン相当の操作＋自動デュッキングの両対応<br>
-          ・URL追加はCORS許可が必要な場合あり
         </div>
       </details>
     </section>
@@ -279,20 +281,26 @@
   let ctx, mainSrc, bgmSrc, mainGain, bgmGain, analyser, dataArray;
   function ensureCtx(){
     if(ctx) return;
-    ctx = new (window.AudioContext || window.webkitAudioContext)();
-    mainSrc = ctx.createMediaElementSource(audio);
-    bgmSrc  = ctx.createMediaElementSource(bgm);
-    mainGain = ctx.createGain(); mainGain.gain.value = 1;
-    bgmGain  = ctx.createGain(); bgmGain.gain.value  = 0.5;
-    analyser = ctx.createAnalyser(); analyser.fftSize = 2048;
-    dataArray = new Uint8Array(analyser.frequencyBinCount);
-    mainSrc.connect(mainGain).connect(analyser).connect(ctx.destination);
-    bgmSrc.connect(bgmGain).connect(ctx.destination);
+    try {
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+      mainSrc = ctx.createMediaElementSource(audio);
+      bgmSrc  = ctx.createMediaElementSource(bgm);
+      mainGain = ctx.createGain(); mainGain.gain.value = 1;
+      bgmGain  = ctx.createGain(); bgmGain.gain.value  = 0.5;
+      analyser = ctx.createAnalyser(); analyser.fftSize = 2048;
+      dataArray = new Uint8Array(analyser.frequencyBinCount);
+      mainSrc.connect(mainGain).connect(analyser).connect(ctx.destination);
+      bgmSrc.connect(bgmGain).connect(ctx.destination);
+    } catch(e) {
+      console.error("AudioContextの初期化に失敗しました。", e);
+      alert("オーディオ機能の初期化に失敗しました。ブラウザが対応していない可能性があります。");
+    }
   }
   function now(){ ensureCtx(); return ctx.currentTime; }
   function clamp01(x){ return Math.max(0, Math.min(1, x)); }
   function rampGain(node, target, sec){
     ensureCtx();
+    if(!ctx || !node) return;
     const t = Math.max(0, Number(sec)||0);
     const n = now();
     const cur = node.gain.value;
@@ -308,7 +316,7 @@
     currentIndex: -1,
     wakeLock: null,
     duck: { enable:true, prevVol:0.5 },
-    bgmCueIn: null, bgmCueOut: null,
+    bgm: { path: null, cueIn: null, cueOut: null },
   };
 
   // ===== Common helpers =====
@@ -416,6 +424,39 @@
   const duckSec = $('#duckSec');
   const unduckSec = $('#unduckSec');
 
+  // ===== Settings (localStorage) =====
+  const SETTINGS_KEY = 'soundboard.settings.v2';
+  function saveSettings(){
+    try {
+      const trackSettings = {};
+      state.tracks.forEach(t => {
+        if(t.path){ // pathを持つものだけ保存
+          trackSettings[t.path] = { cueIn: t.cueIn, cueOut: t.cueOut };
+        }
+      });
+      const settings = {
+        tracks: trackSettings,
+        bgm: state.bgm,
+        volumes: { main: mainGain?.gain.value ?? 1, bgm: bgmGain?.gain.value ?? 0.5 },
+        toggles: {
+          autoAdvance: autoAdvance.checked, playFromIn: playFromIn.checked, autoStopAtOut: autoStopAtOut.checked,
+          bgmLoop: bgmLoop.checked, bgmAutoStopAtOut: bgmAutoStopAtOut.checked,
+          duckEnable: duckEnable.checked
+        },
+        fadeSec: { mainIn: fadeInSec.value, mainOut: fadeOutSec.value, bgmIn: bgmFadeInSec.value, bgmOut: bgmFadeOutSec.value },
+        duckParams: { target: duckTarget.value, duck: duckSec.value, unduck: unduckSec.value }
+      };
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    } catch(e) { console.warn('設定の保存に失敗しました', e); }
+  }
+  function loadSettings(){
+    try {
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      if(!raw) return null;
+      return JSON.parse(raw);
+    } catch(e) { console.warn('設定の読み込みに失敗しました', e); return null; }
+  }
+
   // ===== Playlist render =====
   function renderPlaylist(){
     const q = (search.value||'').trim().toLowerCase();
@@ -461,35 +502,47 @@
     else if(from < state.currentIndex && to >= state.currentIndex) state.currentIndex--; 
     else if(from > state.currentIndex && to <= state.currentIndex) state.currentIndex++;
     renderPlaylist();
+    // Note: 並び順の永続化は未対応
   }
   function selectIndex(idx){
     const old = state.currentIndex;
     state.currentIndex = idx;
-    renderPlaylist();
+    
     const tr = state.tracks[idx];
-    if(!tr) return;
+    if(!tr) {
+      titleEl.textContent = '—';
+      audio.src = '';
+      return;
+    }
     titleEl.textContent = tr.name;
     audio.src = tr.url;
     audio.load();
     inTimeEl.textContent = tr.cueIn!=null ? formatTime(tr.cueIn) : '—';
     outTimeEl.textContent = tr.cueOut!=null ? formatTime(tr.cueOut) : '—';
     if(old!==idx){ pause(); }
+    renderPlaylist();
   }
   function removeAt(i){
     const [removed] = state.tracks.splice(i,1);
     try{ if(removed.kind==='local' && removed.url.startsWith('blob:')) URL.revokeObjectURL(removed.url);}catch{}
-    if(state.currentIndex===i){ pause(); audio.src=''; state.currentIndex = Math.min(i, state.tracks.length-1); }
-    else if(i < state.currentIndex) state.currentIndex--;
+    if(state.currentIndex===i){
+      pause(); audio.src='';
+      const newIndex = Math.min(i, state.tracks.length - 1);
+      state.currentIndex = -1; // 強制的に再選択させる
+      selectIndex(newIndex);
+    } else if(i < state.currentIndex) {
+      state.currentIndex--;
+    }
     renderPlaylist();
-    saveUrls();
+    saveSettings();
   }
 
   // ===== File/URL =====
-  function addFiles(files){
+  function addFiles(files, kind='local'){
     const arr = Array.from(files || []);
     arr.forEach(f => {
       const url = URL.createObjectURL(f);
-      state.tracks.push({id:crypto.randomUUID(), name:f.name, url, kind:'local', cueIn:null, cueOut:null});
+      state.tracks.push({id:crypto.randomUUID(), name:f.name, url, kind, path:null, cueIn:null, cueOut:null});
     });
     if(state.currentIndex<0 && state.tracks.length) selectIndex(0); else renderPlaylist();
   }
@@ -497,27 +550,15 @@
     const url = prompt('音源URLを貼り付け (mp3, wav 等 / CORS許可が必要な場合あり)');
     if(!url) return;
     const name = prompt('曲名 (省略可)') || url.split('/').pop();
-    state.tracks.push({id:crypto.randomUUID(), name, url, kind:'url', cueIn:null, cueOut:null});
+    state.tracks.push({id:crypto.randomUUID(), name, url, kind:'url', path:url, cueIn:null, cueOut:null});
     if(state.currentIndex<0) selectIndex(0); else renderPlaylist();
-    saveUrls();
-  }
-  function saveUrls(){
-    const urls = state.tracks.filter(t=>t.kind==='url').map(t=>({name:t.name, url:t.url, cueIn:t.cueIn, cueOut:t.cueOut}));
-    localStorage.setItem('soundboard.urls', JSON.stringify(urls));
-  }
-  function restoreUrls(){
-    try{
-      const raw = localStorage.getItem('soundboard.urls');
-      if(!raw) return;
-      const urls = JSON.parse(raw);
-      urls.forEach(u=> state.tracks.push({id:crypto.randomUUID(), name:u.name, url:u.url, kind:'url', cueIn:u.cueIn ?? null, cueOut:u.cueOut ?? null}));
-      if(state.tracks.length) selectIndex(0); else renderPlaylist();
-    }catch{}
+    saveSettings();
   }
 
   // ===== Main transport =====
   async function play(){
     ensureCtx();
+    if(!ctx) return;
     await ctx.resume();
     if(startFromZero.checked) rampGain(mainGain, 0, 0);
     const tr = state.tracks[state.currentIndex];
@@ -531,7 +572,7 @@
       await audio.play();
       playPauseBtn.textContent = '⏸️ 一時停止';
       playPauseBtn.classList.remove('primary');
-    }catch(err){ alert('再生できませんでした: ' + err.message); }
+    }catch(err){ console.error('再生エラー', err); alert('再生できませんでした: ' + err.message); }
   }
   function pause(){
     audio.pause();
@@ -572,7 +613,7 @@
     if(!tr) return;
     if(autoStopAtOut.checked && tr.cueOut!=null){
       const remain = tr.cueOut - (audio.currentTime||0);
-      if(remain <= 0){ stop(); }
+      if(remain <= 0.05){ stop(); }
       else if(remain > 0 && remain < 0.25){
         const sec = Math.max(0.15, Number(fadeOutSec.value)||0.15);
         fadeMainTo(0, Math.min(sec, remain+0.05), {stopAfter:true});
@@ -587,6 +628,9 @@
   stopBtn.addEventListener('click', stop);
   seekBackBtn.addEventListener('click', ()=>{ audio.currentTime = Math.max(0, (audio.currentTime||0) - 5); });
   seekFwdBtn.addEventListener('click', ()=>{ const d=audio.duration||0; audio.currentTime = Math.min(d, (audio.currentTime||0) + 5); });
+  prevBtn.addEventListener('click', () => { if (state.currentIndex > 0) selectIndex(state.currentIndex - 1); });
+  nextBtn.addEventListener('click', () => { if (state.currentIndex < state.tracks.length - 1) selectIndex(state.currentIndex + 1); });
+
 
   fadeInBtn.addEventListener('click', ()=>{
     if(audio.paused) play();
@@ -608,10 +652,10 @@
   volUp.addEventListener('click', ()=> setMainVol((mainGain?.gain.value||1)+0.05));
   muteBtn.addEventListener('click', ()=> setMainVol((mainGain?.gain.value||1)>0 ? 0 : 1) );
 
-  setInBtn.addEventListener('click', ()=>{ const tr = state.tracks[state.currentIndex]; if(!tr) return; tr.cueIn=Math.floor(audio.currentTime||0); inTimeEl.textContent=formatTime(tr.cueIn); saveUrls(); });
-  setOutBtn.addEventListener('click', ()=>{ const tr = state.tracks[state.currentIndex]; if(!tr) return; tr.cueOut=Math.floor(audio.currentTime||0); outTimeEl.textContent=formatTime(tr.cueOut); saveUrls(); });
+  setInBtn.addEventListener('click', ()=>{ const tr = state.tracks[state.currentIndex]; if(!tr) return; tr.cueIn=Math.floor(audio.currentTime||0); inTimeEl.textContent=formatTime(tr.cueIn); renderPlaylist(); saveSettings(); });
+  setOutBtn.addEventListener('click', ()=>{ const tr = state.tracks[state.currentIndex]; if(!tr) return; tr.cueOut=Math.floor(audio.currentTime||0); outTimeEl.textContent=formatTime(tr.cueOut); renderPlaylist(); saveSettings(); });
   goInBtn.addEventListener('click', ()=>{ const tr = state.tracks[state.currentIndex]; if(tr && tr.cueIn!=null){ audio.currentTime = tr.cueIn; }});
-  clearCueBtn.addEventListener('click', ()=>{ const tr = state.tracks[state.currentIndex]; if(!tr) return; tr.cueIn=null; tr.cueOut=null; inTimeEl.textContent='—'; outTimeEl.textContent='—'; saveUrls(); });
+  clearCueBtn.addEventListener('click', ()=>{ const tr = state.tracks[state.currentIndex]; if(!tr) return; tr.cueIn=null; tr.cueOut=null; inTimeEl.textContent='—'; outTimeEl.textContent='—'; renderPlaylist(); saveSettings(); });
 
   audio.addEventListener('play', ()=>{ if(rafId) cancelAnimationFrame(rafId); rafId=requestAnimationFrame(loop); });
   audio.addEventListener('pause', ()=>{ if(rafId) cancelAnimationFrame(rafId); rafId=null; });
@@ -629,9 +673,10 @@
   function setMainVol(v){
     ensureCtx();
     const val = clamp01(v);
-    mainGain.gain.value = val;
+    if(mainGain) mainGain.gain.value = val;
     volumeSlider.value = String(val);
     volNum.value = String(Math.round(val*100));
+    saveSettings();
   }
   function setMainVolByPercent(p){
     setMainVol((Math.max(0, Math.min(100, Number(p)))||0)/100);
@@ -641,17 +686,26 @@
   function setBgmVol(v){
     ensureCtx();
     const val = clamp01(v);
-    bgmGain.gain.value = val;
+    if(bgmGain) bgmGain.gain.value = val;
     bgmVolume.value = String(val);
     bgmVolNum.value = String(Math.round(val*100));
+    saveSettings();
   }
   function setBgmVolByPercent(p){ setBgmVol((Math.max(0, Math.min(100, Number(p)))||0)/100); }
+  function setBgmFile(url, name){
+      bgm.src = url;
+      bgm.load();
+      bgmTitle.textContent = 'BGM: ' + name;
+      state.bgm.path = url; // ローカルファイルの場合はblob URLが入るが、これは保存しても復元不能
+      saveSettings();
+  }
 
   async function bgmPlay(){
     ensureCtx();
+    if(!ctx) return;
     await ctx.resume();
     if(bgmStartFromZero.checked) rampGain(bgmGain, 0, 0);
-    if(state.bgmCueIn!=null) bgm.currentTime = state.bgmCueIn;
+    if(state.bgm.cueIn!=null) bgm.currentTime = state.bgm.cueIn;
     try{ await bgm.play(); }catch(e){ alert('BGM再生失敗: '+e.message); }
   }
   function bgmPause(){ bgm.pause(); }
@@ -673,9 +727,9 @@
   }
   function checkBgmCueAutoStop(){
     if(!bgmAutoStopAtOut.checked) return;
-    if(state.bgmCueOut==null) return;
-    const remain = state.bgmCueOut - (bgm.currentTime||0);
-    if(remain <= 0){ bgmStop(); }
+    if(state.bgm.cueOut==null) return;
+    const remain = state.bgm.cueOut - (bgm.currentTime||0);
+    if(remain <= 0.05){ bgmStop(); }
     else if(remain > 0 && remain < 0.25){
       const sec = Math.max(0.15, Number(bgmFadeOutSec.value)||0.15);
       bgmFadeTo(0, Math.min(sec, remain+0.05), {stopAfter:true});
@@ -687,16 +741,14 @@
   bgmFileInput.addEventListener('change', (e)=>{
     const f = e.target.files?.[0]; if(!f) return;
     const url = URL.createObjectURL(f);
-    bgm.src = url; bgm.load();
-    bgmTitle.textContent = 'BGM: ' + f.name;
+    setBgmFile(url, f.name);
   });
   bgmAddUrl.addEventListener('click', ()=>{
     const url = prompt('BGMのURL (CORS許可が必要な場合あり)');
     if(!url) return;
-    bgm.src = url; bgm.load();
-    bgmTitle.textContent = 'BGM: ' + (url.split('/').pop() || url);
+    setBgmFile(url, url.split('/').pop() || url);
   });
-  bgmLoop.addEventListener('change', ()=> bgm.loop = bgmLoop.checked );
+  bgmLoop.addEventListener('change', ()=> { bgm.loop = bgmLoop.checked; saveSettings(); } );
 
   bgmPlayBtn.addEventListener('click', bgmPlay);
   bgmPauseBtn.addEventListener('click', bgmPause);
@@ -705,7 +757,7 @@
   bgmSeekBack.addEventListener('click', ()=>{ bgm.currentTime = Math.max(0, (bgm.currentTime||0) - 5); });
   bgmSeekFwd.addEventListener('click',  ()=>{ const d=bgm.duration||0; bgm.currentTime = Math.min(d, (bgm.currentTime||0) + 5); });
 
-  bgmFadeInBtn.addEventListener('click', ()=>{ if(bgm.paused) bgmPlay(); bgmFadeTo( clamp01(bgmGain.gain.value || 0.5), Number(bgmFadeInSec.value)||0 ); });
+  bgmFadeInBtn.addEventListener('click', ()=>{ if(bgm.paused) bgmPlay(); bgmFadeTo( clamp01(Number(bgmVolNum.value)/100 || 0.5), Number(bgmFadeInSec.value)||0 ); });
   bgmFadeOutBtn.addEventListener('click', ()=> bgmFadeTo(0, Number(bgmFadeOutSec.value)||0) );
   bgmFadeStopBtn.addEventListener('click', ()=> bgmFadeTo(0, Number(bgmFadeOutSec.value)||0, {stopAfter:true}) );
 
@@ -721,10 +773,10 @@
   });
 
   // BGM cues
-  bgmSetInBtn.addEventListener('click', ()=>{ state.bgmCueIn = Math.floor(bgm.currentTime||0); bgmInTimeEl.textContent = formatTime(state.bgmCueIn); });
-  bgmSetOutBtn.addEventListener('click', ()=>{ state.bgmCueOut = Math.floor(bgm.currentTime||0); bgmOutTimeEl.textContent = formatTime(state.bgmCueOut); });
-  bgmGoInBtn.addEventListener('click', ()=>{ if(state.bgmCueIn!=null){ bgm.currentTime = state.bgmCueIn; }});
-  bgmClearCueBtn.addEventListener('click', ()=>{ state.bgmCueIn=null; state.bgmCueOut=null; bgmInTimeEl.textContent='—'; bgmOutTimeEl.textContent='—'; });
+  bgmSetInBtn.addEventListener('click', ()=>{ state.bgm.cueIn = Math.floor(bgm.currentTime||0); bgmInTimeEl.textContent = formatTime(state.bgm.cueIn); saveSettings(); });
+  bgmSetOutBtn.addEventListener('click', ()=>{ state.bgm.cueOut = Math.floor(bgm.currentTime||0); bgmOutTimeEl.textContent = formatTime(state.bgm.cueOut); saveSettings(); });
+  bgmGoInBtn.addEventListener('click', ()=>{ if(state.bgm.cueIn!=null){ bgm.currentTime = state.bgm.cueIn; }});
+  bgmClearCueBtn.addEventListener('click', ()=>{ state.bgm.cueIn=null; state.bgm.cueOut=null; bgmInTimeEl.textContent='—'; bgmOutTimeEl.textContent='—'; saveSettings(); });
 
   bgm.addEventListener('loadedmetadata', updBgmTime);
   bgm.addEventListener('timeupdate', updBgmTime);
@@ -734,15 +786,21 @@
   fileInput.addEventListener('change', (e)=> addFiles(e.target.files));
   addUrlBtn.addEventListener('click', addUrlPrompt);
   clearListBtn.addEventListener('click', ()=>{
+    const repoTracks = state.tracks.filter(t => t.kind === 'repo');
     state.tracks.forEach(t=>{ if(t.kind==='local' && t.url.startsWith('blob:')) try{URL.revokeObjectURL(t.url);}catch{} });
-    state.tracks.length = 0;
+    state.tracks = repoTracks; // GitHubから読み込んだ曲は残す
     state.currentIndex = -1;
-    audio.src=''; renderPlaylist(); saveUrls();
+    audio.src=''; selectIndex(0); renderPlaylist(); saveSettings();
   });
   dropzone.addEventListener('dragover', (e)=>{ e.preventDefault(); dropzone.classList.add('dragging'); });
   dropzone.addEventListener('dragleave', ()=> dropzone.classList.remove('dragging'));
   dropzone.addEventListener('drop', (e)=>{ e.preventDefault(); dropzone.classList.remove('dragging'); addFiles(e.dataTransfer.files); });
   search.addEventListener('input', ()=> renderPlaylist() );
+  
+  // Save settings on toggle/input change
+  [autoAdvance, playFromIn, autoStopAtOut, bgmLoop, bgmAutoStopAtOut, duckEnable].forEach(el => el.addEventListener('change', saveSettings));
+  [fadeInSec, fadeOutSec, bgmFadeInSec, bgmFadeOutSec, duckTarget, duckSec, unduckSec].forEach(el => el.addEventListener('input', saveSettings));
+
 
   // ===== WakeLock / Panic =====
   async function requestWakeLock(){
@@ -759,15 +817,112 @@
 
   panicBtn.addEventListener('click', ()=>{ rampGain(mainGain, 0, 0.2); rampGain(bgmGain, 0, 0.2); setTimeout(()=>{ audio.pause(); audio.currentTime = 0; bgm.pause(); }, 220); });
 
-  // ===== Init =====
-  restoreUrls();
-  renderPlaylist();
-  setMainVol(1);
-  setBgmVol(0.5);
-  bgm.loop = true;
+  // ===== Init & GitHub Playlist Loader =====
+  
+  /**
+   * GitHubリポジトリの 'audio' フォルダから音声ファイルを読み込む
+   */
+  async function loadPlaylistFromGitHub(){
+    // GitHub PagesのURLからユーザー名とリポジトリ名を取得
+    const host = window.location.hostname;
+    const path = window.location.pathname;
+    
+    // この方法は 'username.github.io/repo/' 形式のURLでのみ動作
+    if(!host.endsWith('github.io')){
+      console.warn("GitHub PagesのURLではないため、プレイリストの自動読み込みをスキップします。");
+      return;
+    }
+    
+    const owner = host.split('.')[0];
+    const repo = path.split('/')[1];
 
-  // kick UI loop
-  requestAnimationFrame(loop);
+    if(!owner || !repo){
+      console.error("ユーザー名またはリポジトリ名を取得できませんでした。");
+      return;
+    }
+
+    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/audio`;
+    console.log(`Fetching playlist from: ${apiUrl}`);
+
+    try {
+      const res = await fetch(apiUrl);
+      if(!res.ok) throw new Error(`GitHub APIの呼び出しに失敗 (${res.status})。'audio'フォルダが存在し、リポジトリが公開されているか確認してください。`);
+      
+      const files = await res.json();
+      const audioExtensions = ['.mp3', '.wav', '.ogg', '.flac', '.m4a', '.aac'];
+      
+      const audioFiles = files
+        .filter(file => file.type === 'file' && audioExtensions.some(ext => file.name.toLowerCase().endsWith(ext)))
+        .map(file => ({
+          name: file.name.replace(/\.[^/.]+$/, ""), // 拡張子を削除
+          path: file.path, // 'audio/filename.mp3'
+        }));
+
+      return audioFiles;
+
+    } catch(e) {
+      console.error(e);
+      alert(e.message);
+      return [];
+    }
+  }
+
+  async function initialize(){
+    const settings = loadSettings();
+    
+    // Restore settings
+    if(settings){
+      setMainVol(settings.volumes?.main ?? 1);
+      setBgmVol(settings.volumes?.bgm ?? 0.5);
+      if(settings.toggles){
+        autoAdvance.checked = settings.toggles.autoAdvance; playFromIn.checked = settings.toggles.playFromIn; autoStopAtOut.checked = settings.toggles.autoStopAtOut;
+        bgmLoop.checked = settings.toggles.bgmLoop; bgm.loop = bgmLoop.checked; bgmAutoStopAtOut.checked = settings.toggles.bgmAutoStopAtOut;
+        duckEnable.checked = settings.toggles.duckEnable;
+      }
+      if(settings.fadeSec){
+        fadeInSec.value = settings.fadeSec.mainIn; fadeOutSec.value = settings.fadeSec.mainOut;
+        bgmFadeInSec.value = settings.fadeSec.bgmIn; bgmFadeOutSec.value = settings.fadeSec.bgmOut;
+      }
+      if(settings.duckParams){
+        duckTarget.value = settings.duckParams.target; duckSec.value = settings.duckParams.duck; unduckSec.value = settings.duckParams.unduck;
+      }
+      if(settings.bgm && settings.bgm.path){
+        state.bgm = settings.bgm; bgm.src = state.bgm.path; bgm.load();
+        bgmTitle.textContent = "BGM: " + (state.bgm.path.split('/').pop() || state.bgm.path);
+        bgmInTimeEl.textContent = state.bgm.cueIn != null ? formatTime(state.bgm.cueIn) : '—';
+        bgmOutTimeEl.textContent = state.bgm.cueOut != null ? formatTime(state.bgm.cueOut) : '—';
+      }
+    }
+
+    // Load playlist from GitHub
+    const playlistData = await loadPlaylistFromGitHub();
+
+    if(playlistData){
+      const trackSettings = settings?.tracks || {};
+      playlistData.forEach(item => {
+        const saved = trackSettings[item.path] || {};
+        state.tracks.push({
+          id: crypto.randomUUID(),
+          name: item.name,
+          url: item.path, // URLとPathは同じ
+          path: item.path, // 永続化用のキー
+          kind: 'repo',    // GitHubリポジトリからの曲
+          cueIn: saved.cueIn ?? null,
+          cueOut: saved.cueOut ?? null,
+        });
+      });
+    }
+    
+    if(state.tracks.length > 0){
+      selectIndex(0);
+    } else {
+      renderPlaylist();
+    }
+    
+    requestAnimationFrame(loop);
+  }
+
+  initialize();
 
 })();
 </script>
