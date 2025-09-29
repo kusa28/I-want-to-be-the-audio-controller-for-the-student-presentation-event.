@@ -801,4 +801,166 @@
   bgmSetInBtn.addEventListener('click', ()=>{ state.bgm.cueIn = Math.floor(bgm.currentTime||0); bgmInTimeEl.textContent = formatTime(state.bgm.cueIn); saveSettings(); });
   bgmSetOutBtn.addEventListener('click', ()=>{ state.bgm.cueOut = Math.floor(bgm.currentTime||0); bgmOutTimeEl.textContent = formatTime(state.bgm.cueOut); saveSettings(); });
   bgmGoInBtn.addEventListener('click', ()=>{ if(state.bgm.cueIn!=null){ bgm.currentTime = state.bgm.cueIn; }});
-  bgmClearCueBtn.addEventListener('click', ()=>{ state.bgm.cueIn=null; state.bgm.cueOut=null; bgmInTimeEl.textContent='—
+  bgmClearCueBtn.addEventListener('click', ()=>{ state.bgm.cueIn=null; state.bgm.cueOut=null; bgmInTimeEl.textContent='—'; bgmOutTimeEl.textContent='—'; saveSettings(); });
+
+  bgm.addEventListener('loadedmetadata', updBgmTime);
+  bgm.addEventListener('timeupdate', updBgmTime);
+
+  // ===== Left panel controls =====
+  addFilesBtn.addEventListener('click', ()=> fileInput.click());
+  fileInput.addEventListener('change', (e)=> addFiles(e.target.files));
+  addUrlBtn.addEventListener('click', addUrlPrompt);
+  clearListBtn.addEventListener('click', ()=>{
+    const repoTracks = state.tracks.filter(t => t.kind === 'repo');
+    state.tracks.forEach(t=>{ if(t.kind==='local' && t.url.startsWith('blob:')) try{URL.revokeObjectURL(t.url);}catch{} });
+    state.tracks = repoTracks; // GitHubから読み込んだ曲は残す
+    state.currentIndex = -1;
+    audio.src=''; selectIndex(0); renderPlaylist(); saveSettings();
+  });
+  dropzone.addEventListener('dragover', (e)=>{ e.preventDefault(); dropzone.classList.add('dragging'); });
+  dropzone.addEventListener('dragleave', ()=> dropzone.classList.remove('dragging'));
+  dropzone.addEventListener('drop', (e)=>{ e.preventDefault(); dropzone.classList.remove('dragging'); addFiles(e.dataTransfer.files); });
+  search.addEventListener('input', ()=> renderPlaylist() );
+  
+  // Save settings on toggle/input change
+  [autoAdvance, playFromIn, autoStopAtOut, bgmLoop, bgmAutoStopAtOut, duckEnable].forEach(el => el.addEventListener('change', saveSettings));
+  [fadeInSec, fadeOutSec, bgmFadeInSec, bgmFadeOutSec, duckTarget, duckSec, unduckSec].forEach(el => el.addEventListener('input', saveSettings));
+
+
+  // ===== WakeLock / Panic =====
+  async function requestWakeLock(){
+    if(!('wakeLock' in navigator)) return;
+    try{
+      state.wakeLock = await navigator.wakeLock.request('screen');
+      state.wakeLock.addEventListener('release', ()=>{ wakeLockToggle.checked = false; });
+      wakeLockToggle.checked = true;
+    }catch(e){ console.warn('WakeLock failed', e); }
+  }
+  function releaseWakeLock(){ try{ state.wakeLock && state.wakeLock.release(); }catch{} finally{ state.wakeLock=null; wakeLockToggle.checked=false; } }
+  wakeLockToggle.addEventListener('change', ()=>{ wakeLockToggle.checked ? requestWakeLock() : releaseWakeLock(); });
+  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && wakeLockToggle.checked) requestWakeLock(); });
+
+  panicBtn.addEventListener('click', ()=>{ rampGain(mainGain, 0, 0.2); rampGain(bgmGain, 0, 0.2); setTimeout(()=>{ audio.pause(); audio.currentTime = 0; bgm.pause(); }, 220); });
+
+  // ===== Init & GitHub Playlist Loader =====
+  
+  async function loadPlaylistFromGitHub(){
+    const host = window.location.hostname;
+    const pathParts = window.location.pathname.split('/').filter(p => p);
+    
+    // GitHub Pagesでない場合はスキップ
+    if(!host.endsWith('github.io')){
+      console.warn("GitHub PagesのURLではないため、プレイリストの自動読み込みをスキップします。");
+      return null;
+    }
+    
+    const owner = host.split('.')[0];
+    // プロジェクトページ (owner.github.io/repo/) の場合は repo = pathParts[0]
+    // ユーザーページ (owner.github.io/) の場合は repo = owner + '.github.io'
+    const repo = pathParts.length > 0 ? pathParts[0] : `${owner}.github.io`;
+
+    if(!owner || !repo){
+      console.error("ユーザー名またはリポジトリ名を取得できませんでした。");
+      return null;
+    }
+
+    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/audio`;
+    console.log(`[Debug] Fetching playlist from: ${apiUrl}`); // デバッグ用にURLをコンソール出力
+
+    try {
+      const res = await fetch(apiUrl);
+      if(!res.ok) {
+          throw new Error(`GitHub APIエラー (${res.status})。'audio'フォルダが存在し、リポジトリが「公開」設定になっているか確認してください。`);
+      }
+      
+      const files = await res.json();
+      const audioExtensions = ['.mp3', '.wav', '.ogg', '.flac', '.m4a', '.aac'];
+      
+      const audioFiles = files
+        .filter(file => file.type === 'file' && audioExtensions.some(ext => file.name.toLowerCase().endsWith(ext)))
+        .map(file => ({
+          name: file.name.replace(/\.[^/.]+$/, ""), // 拡張子を削除
+          path: file.path, // 'audio/filename.mp3'
+        }));
+
+      return audioFiles;
+
+    } catch(e) {
+      console.error(e);
+      alert(e.message); // ユーザーにもエラーを通知
+      return null;
+    }
+  }
+
+  async function initialize(){
+    const settings = loadSettings();
+    
+    // Restore general settings
+    if(settings){
+      setMainVol(settings.volumes?.main ?? 1);
+      setBgmVol(settings.volumes?.bgm ?? 0.5);
+      if(settings.toggles){
+        autoAdvance.checked = settings.toggles.autoAdvance; playFromIn.checked = settings.toggles.playFromIn; autoStopAtOut.checked = settings.toggles.autoStopAtOut;
+        bgmLoop.checked = settings.toggles.bgmLoop; bgm.loop = bgmLoop.checked; bgmAutoStopAtOut.checked = settings.toggles.bgmAutoStopAtOut;
+        duckEnable.checked = settings.toggles.duckEnable;
+      }
+      if(settings.fadeSec){
+        fadeInSec.value = settings.fadeSec.mainIn; fadeOutSec.value = settings.fadeSec.mainOut;
+        bgmFadeInSec.value = settings.fadeSec.bgmIn; bgmFadeOutSec.value = settings.fadeSec.bgmOut;
+      }
+      if(settings.duckParams){
+        duckTarget.value = settings.duckParams.target; duckSec.value = settings.duckParams.duck; unduckSec.value = settings.duckParams.unduck;
+      }
+    }
+
+    // Load playlist from GitHub
+    const playlistData = await loadPlaylistFromGitHub();
+
+    if(playlistData){
+      const trackSettings = settings?.tracks || {};
+
+      // Populate BGM selector first
+      playlistData.forEach(item => {
+        const option = document.createElement('option');
+        option.value = item.path;
+        option.textContent = item.name;
+        bgmSelectRepo.appendChild(option);
+      });
+      
+      // Restore last used BGM from repo
+      if(settings?.bgmPath && settings.bgmPath.startsWith('audio/')){
+        const bgmSettings = trackSettings[settings.bgmPath];
+        const bgmName = settings.bgmPath.split('/').pop().replace(/\.[^/.]+$/, "");
+        setBgmFile(settings.bgmPath, bgmName, bgmSettings);
+        
+        // Update selector UI if it exists in the list
+        if (bgmSelectRepo.querySelector(`option[value="${settings.bgmPath}"]`)) {
+            bgmSelectRepo.value = settings.bgmPath;
+        }
+      }
+
+      // Populate main playlist
+      playlistData.forEach(item => {
+        const saved = trackSettings[item.path] || {};
+        state.tracks.push({
+          id: crypto.randomUUID(), name: item.name, url: item.path, path: item.path,
+          kind: 'repo', cueIn: saved.cueIn ?? null, cueOut: saved.cueOut ?? null,
+        });
+      });
+    }
+    
+    if(state.tracks.length > 0){
+      selectIndex(0);
+    } else {
+      renderPlaylist();
+    }
+    
+    requestAnimationFrame(loop);
+  }
+
+  initialize();
+
+})();
+</script>
+</body>
+</html>
