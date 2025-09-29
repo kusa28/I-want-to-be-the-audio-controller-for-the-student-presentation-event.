@@ -67,51 +67,60 @@
 
 <div class="container">
   <!-- 左：プレイリスト -->
-  <aside class="stack">
-    <!-- プレイリストタブ -->
-    <div class="panel">
-      <div class="tabs">
-        <div class="tab active" data-tab="main">🎵 メイン</div>
-        <div class="tab" data-tab="bgm">🎼 BGMライブラリ</div>
-      </div>
-      
-      <!-- メインプレイリスト -->
-      <div class="tab-content active" data-content="main">
-        <div class="row" style="justify-content:space-between">
-          <strong>メイン楽曲</strong>
-          <span class="badge" id="countBadge">0 曲</span>
-        </div>
-        <div class="row" style="margin-top:8px">
-          <input id="search" type="text" placeholder="検索 (曲名)" style="flex:1"/>
-        </div>
-        <div class="row" style="margin-top:8px">
-          <input id="fileInput" type="file" accept="audio/*" multiple style="display:none"/>
-          <button id="addFiles" class="btn">📁 追加</button>
-          <button id="addUrl" class="btn">🌐 URL</button>
-          <button id="clearList" class="btn small" title="全消去">🧹</button>
-        </div>
-        <div id="dropzone" class="dropzone" style="margin-top:8px">メイン音源をドラッグ&ドロップ</div>
-        <ul id="playlist" class="playlist" aria-label="Main Playlist"></ul>
-        <div class="row" style="margin-top:6px; justify-content:space-between">
-          <label class="toggle" title="曲が終わったら次へ">
-            <input id="autoAdvance" type="checkbox" checked>
-            <span>自動で次へ</span>
-          </label>
-          <label class="toggle" title="再生時はINから再生">
-            <input id="playFromIn" type="checkbox" checked>
-            <span>INから再生</span>
-          </label>
-        </div>
-      </div>
+  <aside class="panel" id="left">
+    <div class="tabs">
+      <button id="tabPlaylist" class="active">プレイリスト</button>
+      <button id="tabBgm">BGM</button>
+    </div>
 
-      <!-- BGMライブラリ -->
-      <div class="tab-content" data-content="bgm">
-        <div class="row" style="justify-content:space-between">
-          <strong>BGMライブラリ</strong>
-          <span class="badge" id="bgmCountBadge">0 曲</span>
+    <!-- メインのプレイリスト -->
+    <div id="playlistContainer" class="playlist-container">
+      <div class="row" style="justify-content:space-between">
+        <strong>メイン プレイリスト</strong>
+        <span class="badge" id="countBadge">0 曲</span>
+      </div>
+      <ul id="playlist" class="playlist" aria-label="Playlist"></ul>
+    </div>
+
+    <!-- BGMライブラリ -->
+    <div id="bgmPlaylistContainer" class="playlist-container hidden">
+      <div class="row" style="justify-content:space-between">
+        <strong>BGM ライブラリ</strong>
+        <span class="badge" id="bgmCountBadge">0 曲</span>
+      </div>
+      <ul id="bgmPlaylist" class="playlist" aria-label="BGM Playlist"></ul>
+    </div>
+    
+    <div class="row" style="margin-top:8px">
+      <input id="search" type="text" placeholder="検索 (曲名)" style="flex:1"/>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <input id="fileInput" type="file" accept="audio/*" multiple style="display:none"/>
+      <button id="addFiles" class="btn">📁 ファイル追加</button>
+      <button id="addUrl" class="btn">🌐 URL追加</button>
+      <button id="clearList" class="btn" title="全消去">🧹 クリア</button>
+    </div>
+    <div id="dropzone" class="dropzone" style="margin-top:8px">ここに音声ファイルをドラッグ&ドロップ</div>
+
+    <fieldset style="margin-top:8px">
+        <legend>設定</legend>
+        <div class="grid2">
+          <button id="exportSettingsBtn" class="btn">📤 エクスポート</button>
+          <button id="importSettingsBtn" class="btn">📥 インポート</button>
+          <input type="file" id="importFile" accept=".json" style="display:none" />
         </div>
-        <div class="row" style="margin-top:8px">
-          <input id="bgmSearch" type="text" placeholder="BGM検索" style="flex:1"/>
+    </fieldset>
+
+  </aside>
+
+  <!-- 右：メイン操作 -->
+  <main class="stack" id="right">
+    <!-- BGM Player -->
+    <section class="panel">
+      <div class="row" style="justify-content:space-between;align-items:flex-end">
+        <div>
+          <div style="font-size:14px;color:var(--muted)">現在のBGM</div>
+          <div id="bgmTitle" style="font-size:20px;font-weight:800;max-width:70vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">—</div>
         </div>
         <div style="text-align:right;min-width:180px">
           <div class="timer"><span id="bgmElapsed">00:00</span> / <span id="bgmDuration">00:00</span></div>
@@ -184,9 +193,7 @@
       </div>
     </section>
 
-  <!-- 右：メインコントロール -->
-  <main class="stack">
-    <!-- 現在の曲 -->
+    <!-- メイン Player -->
     <section class="panel">
       <div class="row" style="justify-content:space-between">
         <div>
@@ -265,24 +272,9 @@
           <small class="mono">OUT: <span id="outTime">—</span></small>
         </div>
       </fieldset>
-
-      <details class="panel" open style="background:#121722;margin-top:8px">
-        <summary>ℹ️ ヒント</summary>
-        <div style="margin-top:6px;color:var(--muted);font-size:14px">
-          ・iPad対応：全部ボタン操作OK（キーボード不要）<br>
-          ・BGMライブラリでBGMを管理・選択<br>
-          ・BGMも高度なフェードイン・アウト機能付き<br>
-          ・デュッキング：メイン再生中にBGMを自動で下げる<br>
-          ・レベルメーターでメイン・BGM両方の音量レベルを監視
-        </div>
-      </details>
     </section>
   </main>
 </div>
-
-<footer>
-  <small class="note">ローカルの音声ファイルはブラウザ内だけで使われ、外部にアップロードされません。URLで追加した曲のみ保存されます。</small>
-</footer>
 
 <audio id="audio" crossorigin="anonymous"></audio>
 <audio id="bgm" crossorigin="anonymous"></audio>
@@ -327,17 +319,25 @@
 
   // ===== State =====
   const state = {
-    tracks: [], // メイントラック
-    bgmTracks: [], // BGMトラック
+    tracks: [],
+    bgmTracks: [],
     filter: '',
     currentIndex: -1,
     currentBgmIndex: -1,
     wakeLock: null,
-    duck: { enable:true, target:0.2, sec:0.6, prevVol:0.5 },
-    activeTab: 'main'
+    duck: { enable:true, prevVol:0.5 },
   };
 
-  // ===== UI refs =====
+  // ===== Common helpers =====
+  function formatTime(sec){
+    if(!isFinite(sec)) return '00:00';
+    sec = Math.max(0, Math.floor(sec));
+    const m = Math.floor(sec / 60).toString().padStart(2,'0');
+    const s = (sec % 60).toString().padStart(2,'0');
+    return `${m}:${s}`;
+  }
+
+  // ====== UI Refs (Main) ======
   const playlistEl = $('#playlist');
   const countBadge = $('#countBadge');
   const titleEl = $('#title');
@@ -399,11 +399,9 @@
   const importFile = $('#importFile');
 
   // ====== UI Refs (BGM) ======
-  const bgmAddFile = $('#bgmAddFile');
-  const bgmFileInput = $('#bgmFileInput');
-  const bgmAddUrl = $('#bgmAddUrl');
-  const bgmPlayBtn = $('#bgmPlay');
-  const bgmPauseBtn = $('#bgmPause');
+  const bgmPlaylistEl = $('#bgmPlaylist');
+  const bgmCountBadge = $('#bgmCountBadge');
+  const bgmPlayPauseBtn = $('#bgmPlayPause');
   const bgmStopBtn = $('#bgmStop');
   const bgmPrevBtn = $('#bgmPrevBtn');
   const bgmNextBtn = $('#bgmNextBtn');
@@ -445,43 +443,6 @@
   const unduckSec = $('#unduckSec');
 
   // ===== Settings (localStorage) =====
-  const SETTINGS_KEY = 'soundboard.settings.v2';
-  function saveSettings(){
-    try {
-      const trackSettings = {};
-      state.tracks.forEach(t => {
-        if(t.path){ // pathを持つものだけ保存
-          trackSettings[t.path] = { cueIn: t.cueIn, cueOut: t.cueOut };
-        }
-      });
-      // BGMの設定も保存キーをpathにする
-      if (state.bgm.path) {
-        trackSettings[state.bgm.path] = { cueIn: state.bgm.cueIn, cueOut: state.bgm.cueOut };
-      }
-      const settings = {
-        tracks: trackSettings,
-        bgmPath: state.bgm.path, // BGMのパスだけ別途保存
-        volumes: { main: mainGain?.gain.value ?? 1, bgm: bgmGain?.gain.value ?? 0.5 },
-        toggles: {
-          autoAdvance: autoAdvance.checked, playFromIn: playFromIn.checked, autoStopAtOut: autoStopAtOut.checked,
-          bgmLoop: bgmLoop.checked, bgmAutoStopAtOut: bgmAutoStopAtOut.checked,
-          duckEnable: duckEnable.checked
-        },
-        fadeSec: { mainIn: fadeInSec.value, mainOut: fadeOutSec.value, bgmIn: bgmFadeInSec.value, bgmOut: bgmFadeOutSec.value },
-        duckParams: { target: duckTarget.value, duck: duckSec.value, unduck: unduckSec.value }
-      };
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-    } catch(e) { console.warn('設定の保存に失敗しました', e); }
-  }
-  function loadSettings(){
-    try {
-      const raw = localStorage.getItem(SETTINGS_KEY);
-      if(!raw) return null;
-      return JSON.parse(raw);
-    } catch(e) { console.warn('設定の読み込みに失敗しました', e); return null; }
-  }
-
-  // ===== Settings (localStorage) =====
   const SETTINGS_KEY = 'soundboard.settings.v3';
   function saveSettings(){
     try {
@@ -500,7 +461,7 @@
         volumes: { main: mainGain?.gain.value ?? 1, bgm: bgmGain?.gain.value ?? 0.5 },
         toggles: {
           autoAdvance: autoAdvance.checked, playFromIn: playFromIn.checked, autoStopAtOut: autoStopAtOut.checked,
-          bgmLoop: bgmLoop.checked, bgmAutoStopAtOut: bgmAutoStopAtOut, duckEnable: duckEnable.checked,
+          bgmLoop: bgmLoop.checked, bgmAutoStopAtOut: bgmAutoStopAtOut.checked, duckEnable: duckEnable.checked,
           mainStartFromZero: startFromZero.checked, bgmStartFromZero: bgmStartFromZero.checked
         },
         fadeSec: { mainIn: fadeInSec.value, mainOut: fadeOutSec.value, bgmIn: bgmFadeInSec.value, bgmOut: bgmFadeOutSec.value },
@@ -520,235 +481,203 @@
   // ===== Playlist & UI Rendering =====
   function createPlaylistItem(track, index, isBgm = false) {
     const q = (search.value||'').trim().toLowerCase();
-    playlistEl.innerHTML = '';
-    state.tracks.forEach((t, i) => {
-      if(q && !t.name.toLowerCase().includes(q)) return;
-      const li = document.createElement('li');
-      li.draggable = t.type === 'static' ? false : true; // 静的リストはドラッグ無効
-      li.dataset.index = String(i);
-      if(i === state.currentIndex) li.classList.add('active');
-      li.innerHTML = `
-        <span class="badge drag" title="ドラッグで並び替え" style="cursor:${li.draggable ? 'grab' : 'default'}; opacity:${li.draggable ? '.85' : '.3'}">↕</span>
-        <span class="name" title="タップで選択">${t.name}</span>
-        ${t.cueIn!=null ? `<span class="badge">IN ${formatTime(t.cueIn)}</span>`: ''}
-        ${t.cueOut!=null ? `<span class="badge">OUT ${formatTime(t.cueOut)}</span>`: ''}
-        <button class="btn small" data-act="play">▶</button>
-        <button class="btn small" data-act="remove" title="削除">✖</button>
-      `;
-      li.querySelector('.name').addEventListener('click', ()=> selectIndex(i));
-      li.querySelector('[data-act="play"]').addEventListener('click', ()=>{ selectIndex(i); play(); });
-      li.querySelector('[data-act="remove"]').addEventListener('click', ()=>{ removeAt(i); });
-      
-      // drag reorder
-      if(li.draggable){
-        li.addEventListener('dragstart', (e)=>{
-          e.dataTransfer.setData('text/plain', String(i));
-          e.dataTransfer.effectAllowed = 'move';
-        });
-        li.addEventListener('dragover', (e)=>{ e.preventDefault(); e.dataTransfer.dropEffect='move'; });
-        li.addEventListener('drop', (e)=>{
-          e.preventDefault();
-          const from = Number(e.dataTransfer.getData('text/plain'));
-          const to = Number(li.dataset.index);
-          moveItem(from, to);
-        });
+    if(q && !track.name.toLowerCase().includes(q)) return null;
+    
+    const li = document.createElement('li');
+    li.draggable = true;
+    li.dataset.index = String(index);
+
+    const isActive = isBgm ? (index === state.currentBgmIndex) : (index === state.currentIndex);
+    if(isActive) li.classList.add('active');
+    
+    li.innerHTML = `
+      <span class="badge drag" title="ドラッグで並び替え">↕</span>
+      <span class="name" title="タップで選択">${track.name}</span>
+      ${track.cueIn!=null ? `<span class="badge">IN ${formatTime(track.cueIn)}</span>`: ''}
+      ${track.cueOut!=null ? `<span class="badge">OUT ${formatTime(track.cueOut)}</span>`: ''}
+      <button class="btn" data-act="play">▶</button>
+      <button class="btn" data-act="remove" title="削除">✖</button>
+    `;
+    
+    li.querySelector('.name').addEventListener('click', () => isBgm ? selectBgmIndex(index) : selectIndex(index));
+    li.querySelector('[data-act="play"]').addEventListener('click', (e) => {
+      e.stopPropagation();
+      if(isBgm) {
+        selectBgmIndex(index);
+        bgm.paused ? bgmPlay() : bgmPause();
+      } else {
+        selectIndex(index);
+        audio.paused ? play() : pause();
       }
-      
-      playlistEl.appendChild(li);
     });
-    countBadge.textContent = `${state.tracks.length} 曲`;
+    li.querySelector('[data-act="remove"]').addEventListener('click', (e) => { e.stopPropagation(); removeAt(index, isBgm); });
+    
+    li.addEventListener('dragstart', (e)=>{ e.dataTransfer.setData('text/plain', String(index)); e.dataTransfer.effectAllowed = 'move'; });
+    li.addEventListener('dragover', (e)=>{ e.preventDefault(); e.dataTransfer.dropEffect='move'; });
+    li.addEventListener('drop', (e)=>{
+      e.preventDefault();
+      const from = Number(e.dataTransfer.getData('text/plain'));
+      const to = index;
+      moveItem(from, to, isBgm);
+    });
+
+    return li;
   }
 
-  function renderBgmPlaylist(){
-    const q = state.bgmFilter.trim().toLowerCase();
+  function renderPlaylists() {
+    playlistEl.innerHTML = '';
+    state.tracks.forEach((t, i) => {
+      const li = createPlaylistItem(t, i, false);
+      if(li) playlistEl.appendChild(li);
+    });
+    countBadge.textContent = `${state.tracks.length} 曲`;
+
     bgmPlaylistEl.innerHTML = '';
     state.bgmTracks.forEach((t, i) => {
-      if(q && !t.name.toLowerCase().includes(q)) return;
-      const li = document.createElement('li');
-      li.draggable = true;
-      li.dataset.index = String(i);
-      if(i === state.currentBgmIndex) li.classList.add('bgm-active');
-      li.innerHTML = `
-        <span class="badge drag" title="ドラッグで並び替え">↕</span>
-        <span class="name" title="タップでBGM選択">${t.name}</span>
-        <button class="btn small purple" data-act="play">▶</button>
-        <button class="btn small" data-act="remove" title="削除">✖</button>
-      `;
-      li.querySelector('.name').addEventListener('click', ()=> selectBgmIndex(i));
-      li.querySelector('[data-act="play"]').addEventListener('click', ()=>{ selectBgmIndex(i); playBgm(); });
-      li.querySelector('[data-act="remove"]').addEventListener('click', ()=>{ removeBgmAt(i); });
-      // drag reorder
-      li.addEventListener('dragstart', (e)=>{
-        e.dataTransfer.setData('text/plain', String(i));
-        e.dataTransfer.effectAllowed = 'move';
-      });
-      li.addEventListener('dragover', (e)=>{ e.preventDefault(); e.dataTransfer.dropEffect='move'; });
-      li.addEventListener('drop', (e)=>{
-        e.preventDefault();
-        const from = Number(e.dataTransfer.getData('text/plain'));
-        const to = Number(li.dataset.index);
-        moveBgmItem(from, to);
-      });
-      bgmPlaylistEl.appendChild(li);
+      const li = createPlaylistItem(t, i, true);
+      if(li) bgmPlaylistEl.appendChild(li);
     });
     bgmCountBadge.textContent = `${state.bgmTracks.length} 曲`;
   }
-
-  function moveItem(from, to){
-    if(from===to) return;
-    const item = state.tracks.splice(from,1)[0];
-    state.tracks.splice(to,0,item);
-    if(state.currentIndex===from) state.currentIndex = to;
-    else if(from < state.currentIndex && to >= state.currentIndex) state.currentIndex--; 
-    else if(from > state.currentIndex && to <= state.currentIndex) state.currentIndex++;
-    renderPlaylist();
-  }
-
-  function moveBgmItem(from, to){
+  
+  function moveItem(from, to, isBgm){
     if(from === to) return;
-    const item = state.bgmTracks.splice(from,1)[0];
-    state.bgmTracks.splice(to,0,item);
-    if(state.currentBgmIndex === from) state.currentBgmIndex = to;
-    else if(from < state.currentBgmIndex && to >= state.currentBgmIndex) state.currentBgmIndex--; 
-    else if(from > state.currentBgmIndex && to <= state.currentBgmIndex) state.currentBgmIndex++;
-    renderBgmPlaylist();
-  }
+    const targetArray = isBgm ? state.bgmTracks : state.tracks;
+    const item = targetArray.splice(from, 1)[0];
+    targetArray.splice(to, 0, item);
 
+    if (isBgm) {
+      if(state.currentBgmIndex === from) state.currentBgmIndex = to;
+      else if(from < state.currentBgmIndex && to >= state.currentBgmIndex) state.currentBgmIndex--; 
+      else if(from > state.currentBgmIndex && to <= state.currentBgmIndex) state.currentBgmIndex++;
+    } else {
+      if(state.currentIndex === from) state.currentIndex = to;
+      else if(from < state.currentIndex && to >= state.currentIndex) state.currentIndex--; 
+      else if(from > state.currentIndex && to <= state.currentIndex) state.currentIndex++;
+    }
+    renderPlaylists();
+    saveSettings();
+  }
+  
   function selectIndex(idx){
     if (idx < 0 || idx >= state.tracks.length) return;
     const old = state.currentIndex;
     state.currentIndex = idx;
     
     const tr = state.tracks[idx];
-    if(!tr) return;
-    titleEl.textContent = tr.name;
-    audio.src = tr.url;
-    audio.load();
-    inTimeEl.textContent = tr.cueIn!=null ? formatTime(tr.cueIn) : '—';
-    outTimeEl.textContent = tr.cueOut!=null ? formatTime(tr.cueOut) : '—';
-    if(old !== idx){ pause(); }
-  }
-
-  function selectBgmIndex(idx){
-    state.currentBgmIndex = idx;
-    renderBgmPlaylist();
-    const tr = state.bgmTracks[idx];
-    if(!tr) return;
-    bgmTitle.textContent = 'BGM: ' + tr.name;
-    bgm.src = tr.url;
-    bgm.load();
-  }
-
-  function removeAt(i){
-    const [removed] = state.tracks.splice(i,1);
-    try{ if(removed.kind==='local' && removed.url.startsWith('blob:')) URL.revokeObjectURL(removed.url);}catch{}
-    if(state.currentIndex === i){ pause(); audio.src=''; state.currentIndex = Math.min(i, state.tracks.length-1); }
-    else if(i < state.currentIndex) state.currentIndex--;
+    if(!tr) { titleEl.textContent = '—'; audio.src = ''; return; }
     
-    renderPlaylist();
-    saveUrls();
+    titleEl.textContent = tr.name;
+    inTimeEl.textContent = tr.cueIn != null ? formatTime(tr.cueIn) : '—';
+    outTimeEl.textContent = tr.cueOut != null ? formatTime(tr.cueOut) : '—';
+    
+    if (audio.src !== tr.url) {
+        audio.src = tr.url;
+        audio.load();
+        if(old !== idx) pause();
+    }
+    renderPlaylists();
   }
 
-  function removeBgmAt(i){
-    const [removed] = state.bgmTracks.splice(i,1);
-    try{ if(removed.kind==='local' && removed.url.startsWith('blob:')) URL.revokeObjectURL(removed.url);}catch{}
-    if(state.currentBgmIndex === i){ bgm.pause(); bgm.src=''; state.currentBgmIndex = Math.min(i, state.bgmTracks.length-1); }
-    else if(i < state.currentBgmIndex) state.currentBgmIndex--;
-    renderBgmPlaylist();
-    saveBgmUrls();
+  function selectBgmIndex(idx) {
+    if (idx < 0 || idx >= state.bgmTracks.length) return;
+    const old = state.currentBgmIndex;
+    state.currentBgmIndex = idx;
+    
+    const tr = state.bgmTracks[idx];
+    if(!tr) { bgmTitle.textContent = '—'; bgm.src = ''; return; }
+
+    bgmTitle.textContent = tr.name;
+    bgmInTimeEl.textContent = tr.cueIn != null ? formatTime(tr.cueIn) : '—';
+    bgmOutTimeEl.textContent = tr.cueOut != null ? formatTime(tr.cueOut) : '—';
+
+    if (bgm.src !== tr.url) {
+        bgm.src = tr.url;
+        bgm.load();
+        if(old !== idx) bgmPause();
+    }
+    renderPlaylists();
+    saveSettings();
   }
 
-  function addFiles(files){
-    const arr = Array.from(files || []);
-    arr.forEach(f => {
+  function removeAt(i, isBgm){
+    const targetArray = isBgm ? state.bgmTracks : state.tracks;
+    const [removed] = targetArray.splice(i,1);
+    try{ if(removed.kind === 'local' && removed.url.startsWith('blob:')) URL.revokeObjectURL(removed.url);}catch{}
+    
+    if (isBgm) {
+      if(state.currentBgmIndex === i){
+        bgmPause(); bgm.src = '';
+        const newIndex = Math.min(i, targetArray.length - 1);
+        state.currentBgmIndex = -1;
+        selectBgmIndex(newIndex);
+      } else if(i < state.currentBgmIndex) {
+        state.currentBgmIndex--;
+      }
+    } else {
+      if(state.currentIndex === i){
+        pause(); audio.src='';
+        const newIndex = Math.min(i, targetArray.length - 1);
+        state.currentIndex = -1;
+        selectIndex(newIndex);
+      } else if(i < state.currentIndex) {
+        state.currentIndex--;
+      }
+    }
+    renderPlaylists();
+    saveSettings();
+  }
+
+  // ===== File/URL/Drop Handling =====
+  function addFiles(files, kind='local'){
+    const isBgmActive = !bgmPlaylistContainer.classList.contains('hidden');
+    const targetArray = isBgmActive ? state.bgmTracks : state.tracks;
+
+    Array.from(files || []).forEach(f => {
       const url = URL.createObjectURL(f);
-      state.tracks.push({id:crypto.randomUUID(), name:f.name, url, kind:'local', cueIn:null, cueOut:null});
+      targetArray.push({id:crypto.randomUUID(), name:f.name, url, kind, path:null, cueIn:null, cueOut:null});
     });
-    if(state.currentIndex < 0 && state.tracks.length) selectIndex(0);
-    else renderPlaylist();
+    
+    if (isBgmActive) {
+        if(state.currentBgmIndex < 0 && targetArray.length) selectBgmIndex(0); else renderPlaylists();
+    } else {
+        if(state.currentIndex < 0 && targetArray.length) selectIndex(0); else renderPlaylists();
+    }
   }
-
-  function addBgmFiles(files){
-    const arr = Array.from(files || []);
-    arr.forEach(f => {
-      const url = URL.createObjectURL(f);
-      state.bgmTracks.push({id:crypto.randomUUID(), name:f.name, url, kind:'local'});
-    });
-    if(state.currentBgmIndex < 0 && state.bgmTracks.length) selectBgmIndex(0);
-    else renderBgmPlaylist();
-  }
-
   function addUrlPrompt(){
     const url = prompt('音源URLを貼り付け (mp3, wav 等)');
     if(!url) return;
     const name = prompt('曲名 (省略可)') || url.split('/').pop();
-    state.tracks.push({id:crypto.randomUUID(), name, url, kind:'url', cueIn:null, cueOut:null});
-    if(state.currentIndex < 0) selectIndex(0);
-    else renderPlaylist();
-    saveUrls();
-  }
+    const isBgmActive = !bgmPlaylistContainer.classList.contains('hidden');
+    const targetArray = isBgmActive ? state.bgmTracks : state.tracks;
+    targetArray.push({id:crypto.randomUUID(), name, url, kind:'url', path:url, cueIn:null, cueOut:null});
 
-  function addBgmUrlPrompt(){
-    const url = prompt('BGM URLを貼り付け (mp3, wav 等 / CORS許可が必要な場合あり)');
-    if(!url) return;
-    const name = prompt('BGM名 (省略可)') || url.split('/').pop();
-    state.bgmTracks.push({id:crypto.randomUUID(), name, url, kind:'url'});
-    if(state.currentBgmIndex < 0) selectBgmIndex(0);
-    else renderBgmPlaylist();
-    saveBgmUrls();
-  }
-
-  function saveUrls(){
-    const urls = state.tracks.filter(t=>t.kind==='url').map(t=>({name:t.name, url:t.url, cueIn:t.cueIn, cueOut:t.cueOut}));
-    localStorage.setItem('soundboard.urls', JSON.stringify(urls));
-  }
-
-  function saveBgmUrls(){
-    const urls = state.bgmTracks.filter(t=>t.kind==='url').map(t=>({name:t.name, url:t.url}));
-    localStorage.setItem('soundboard.bgmUrls', JSON.stringify(urls));
-  }
-
-  function restoreUrls(){
-    try{
-      const raw = localStorage.getItem('soundboard.urls');
-      if(raw){
-        const urls = JSON.parse(raw);
-        urls.forEach(u=> state.tracks.push({id:crypto.randomUUID(), name:u.name, url:u.url, kind:'url', cueIn:u.cueIn ?? null, cueOut:u.cueOut ?? null}));
-        if(state.tracks.length) selectIndex(0);
-      }
-    }catch{}
-  }
-
-  function restoreBgmUrls(){
-    try{
-      const raw = localStorage.getItem('soundboard.bgmUrls');
-      if(raw){
-        const urls = JSON.parse(raw);
-        urls.forEach(u=> state.bgmTracks.push({id:crypto.randomUUID(), name:u.name, url:u.url, kind:'url'}));
-        if(state.bgmTracks.length) selectBgmIndex(0);
-      }
-    }catch{}
-  }
-
-  // ===== Main Audio Controls =====
-  async function play(){
-    ensureCtx();
-    await ctx.resume();
-    // 曲固有の音量を設定
-    const tr = state.tracks[state.currentIndex];
-    if(tr && tr.cueIn != null && playFromIn.checked){
-      audio.currentTime = tr.cueIn;
+    if (isBgmActive) {
+        if(state.currentBgmIndex < 0) selectBgmIndex(0); else renderPlaylists();
+    } else {
+        if(state.currentIndex < 0) selectIndex(0); else renderPlaylists();
     }
-    // Duck BGM if enabled
-    if(state.duck.enable && !bgm.paused){
+    saveSettings();
+  }
+  
+  // ===== Main Transport =====
+  async function play(){
+    ensureCtx(); if(!ctx) return;
+    await ctx.resume();
+    // BUGFIX: Set gain to slider value before playing, unless "0 -> fade" is on
+    if (!startFromZero.checked) { rampGain(mainGain, Number(volumeSlider.value), 0); }
+
+    const tr = state.tracks[state.currentIndex];
+    if(tr && tr.cueIn != null && playFromIn.checked && audio.currentTime < tr.cueIn){ audio.currentTime = tr.cueIn; }
+    
+    if(duckEnable.checked){
       state.duck.prevVol = bgmGain.gain.value;
       rampGain(bgmGain, Number(duckTarget.value)/100, Number(duckSec.value));
     }
     try{
       await audio.play();
-      playPauseBtn.textContent = '⏸️ 一時停止';
-      playPauseBtn.classList.remove('primary');
-    }catch(err){ alert('再生できませんでした: ' + err.message); }
+      playPauseBtn.textContent = '⏸️ 一時停止'; playPauseBtn.classList.remove('primary');
+    }catch(err){ console.error('再生エラー', err); alert('再生できませんでした: ' + err.message); }
   }
   function pause(){
     audio.pause();
@@ -767,161 +696,163 @@
     }
   }
 
-  // ===== BGM Audio Controls =====
-  async function playBgm(){
-    ensureCtx();
-    await ctx.resume();
-    try{
-      await bgm.play();
-      bgmPlayBtn.textContent = '⏸ 停止';
-      bgmPlayBtn.classList.remove('purple');
-    }catch(err){
-      alert('BGM再生できませんでした: ' + err.message);
-    }
+  // ===== Main Meters & Time Update =====
+  function updMainTime(){
+    const d = audio.duration||0, c = audio.currentTime||0;
+    elapsedEl.textContent = formatTime(c);
+    durationEl.textContent = formatTime(d);
+    remainingEl.textContent = formatTime(Math.max(0, d-c));
+    progressBar.style.width = `${d ? (c/d*100) : 0}%`;
   }
-
-  function pauseBgm(){
-    bgm.pause();
-    bgmPlayBtn.textContent = '▶ 再生';
-    bgmPlayBtn.classList.add('purple');
-  }
-
-  function fadeBgmTo(target, sec){
-    ensureCtx();
-    const t = Math.max(0, Number(sec)||0);
-    rampGain(bgmGain, target, t);
-  }
-
-  // ===== Time / Level Updates =====
-  function updateTime(){
-    const dur = audio.duration || 0;
-    const cur = audio.currentTime || 0;
-    elapsedEl.textContent = formatTime(cur);
-    durationEl.textContent = formatTime(dur);
-    remainingEl.textContent = formatTime(Math.max(0, dur - cur));
-    progressBar.style.width = `${dur ? (cur/dur*100) : 0}%`;
-
-    const bgmDur = bgm.duration || 0;
-    const bgmCur = bgm.currentTime || 0;
-    bgmElapsedEl.textContent = formatTime(bgmCur);
-    bgmDurationEl.textContent = formatTime(bgmDur);
-    bgmProgressBar.style.width = `${bgmDur ? (bgmCur/bgmDur*100) : 0}%`;
-  }
-
-  function updateLevel(){
-    // Main level
-    const mainDb = calculateLevel(mainAnalyser, mainDataArray);
-    levelMeter.value = Math.max(-60, Math.min(0, mainDb));
-    levelDb.textContent = (mainDb <= -59 ? '-∞' : mainDb.toFixed(1)) + ' dB';
-
-    // BGM level
-    const bgmDb = calculateLevel(bgmAnalyser, bgmDataArray);
-    bgmLevel.value = Math.max(-60, Math.min(0, bgmDb));
-    bgmLevelDb.textContent = (bgmDb <= -59 ? '-∞' : bgmDb.toFixed(1)) + ' dB';
+  function updLevel(){
+    if(!analyser) return;
+    analyser.getByteTimeDomainData(dataArray);
+    let sum = 0; for(let i=0;i<dataArray.length;i++){ const v=(dataArray[i]-128)/128; sum+=v*v; }
+    const rms=Math.sqrt(sum/dataArray.length)||1e-7, db=20*Math.log10(rms);
+    levelMeter.value = Math.max(-60, Math.min(0, db));
+    levelDb.textContent = (db<=-59?'-∞':db.toFixed(1)) + ' dB';
   }
   function checkCueOutAutoStop(){
     const tr = state.tracks[state.currentIndex];
     if(!tr) return;
     if(autoStopAtOut.checked && tr.cueOut!=null){
-      const remain = tr.cueOut - (audio.currentTime||0);
-      if(remain <= 0){ stop(); }
-      else if(remain > 0 && remain < 0.25){
-        const sec = Math.max(0.15, Number(fadeOutSec.value)||0.15);
+      const remain = tr.cueOut - audio.currentTime;
+      if(remain <= 0.05){ stop(); }
+      else if(remain > 0 && remain < 0.3){
+        const sec = Math.max(0.15, Number(fadeOutSec.value));
         fadeMainTo(0, Math.min(sec, remain+0.05), {stopAfter:true});
       }
     }
   }
 
-  let rafId = null;
-  function loop(){
-    updateTime();
-    updateLevel();
-    checkCueOutAutoStop();
-    rafId = requestAnimationFrame(loop);
-  }
-  function startLoop(){ if(rafId) cancelAnimationFrame(rafId); rafId = requestAnimationFrame(loop); }
-  function stopLoop(){ if(rafId) cancelAnimationFrame(rafId); rafId = null; }
+  // ===== Main Player Events =====
+  playPauseBtn.addEventListener('click', ()=> audio.paused ? play() : pause() );
+  stopBtn.addEventListener('click', stop);
+  seekBackBtn.addEventListener('click', ()=>{ audio.currentTime = Math.max(0, audio.currentTime - 5); });
+  seekFwdBtn.addEventListener('click', ()=>{ const d=audio.duration||0; audio.currentTime = Math.min(d, audio.currentTime + 5); });
+  prevBtn.addEventListener('click', () => { if (state.currentIndex > 0) selectIndex(state.currentIndex - 1); });
+  nextBtn.addEventListener('click', () => { if (state.currentIndex < state.tracks.length - 1) selectIndex(state.currentIndex + 1); });
+  
+  fadeInBtn.addEventListener('click', ()=>{
+    if(audio.paused) play();
+    if(startFromZero.checked) rampGain(mainGain, 0, 0);
+    // BUGFIX: Fade to slider value, not max
+    rampGain(mainGain, Number(volumeSlider.value), Number(fadeInSec.value));
+  });
+  fadeOutBtn.addEventListener('click', ()=> fadeMainTo(0, Number(fadeOutSec.value)) );
+  fadeStopBtn.addEventListener('click', ()=> fadeMainTo(0, Number(fadeOutSec.value), {stopAfter:true}) );
 
-  // ===== Volume Controls =====
-  function setMainVol(v){
+  progress.addEventListener('click', (e)=>{
+    const r = progress.getBoundingClientRect();
+    const ratio = clamp01((e.clientX - r.left) / r.width);
+    if(isFinite(audio.duration)) audio.currentTime = ratio * audio.duration;
+  });
+
+  function setMainVol(v, save=true){
     ensureCtx();
     const val = clamp01(v);
     if(mainGain) mainGain.gain.value = val;
     volumeSlider.value = String(val);
-    volNum.value = String(Math.round(val * 100));
+    volNum.value = String(Math.round(val*100));
+    if(save) saveSettings();
+  }
+  volumeSlider.addEventListener('input', ()=> setMainVol(Number(volumeSlider.value)) );
+  volNum.addEventListener('input', ()=> setMainVol(Number(volNum.value)/100));
+  volDown.addEventListener('click', ()=> setMainVol(mainGain.gain.value - 0.05));
+  volUp.addEventListener('click', ()=> setMainVol(mainGain.gain.value + 0.05));
+  muteBtn.addEventListener('click', ()=> setMainVol(mainGain.gain.value > 0 ? 0 : (Number(volumeSlider.value) || 1)) );
+
+  setInBtn.addEventListener('click', ()=>{ const tr = state.tracks[state.currentIndex]; if(!tr) return; tr.cueIn=Math.floor(audio.currentTime); renderPlaylists(); saveSettings(); });
+  setOutBtn.addEventListener('click', ()=>{ const tr = state.tracks[state.currentIndex]; if(!tr) return; tr.cueOut=Math.floor(audio.currentTime); renderPlaylists(); saveSettings(); });
+  goInBtn.addEventListener('click', ()=>{ const tr = state.tracks[state.currentIndex]; if(tr && tr.cueIn!=null){ audio.currentTime = tr.cueIn; }});
+  clearCueBtn.addEventListener('click', ()=>{ const tr = state.tracks[state.currentIndex]; if(!tr) return; tr.cueIn=null; tr.cueOut=null; renderPlaylists(); saveSettings(); });
+
+  audio.addEventListener('play', ()=>{ if(!rafId) rafId = requestAnimationFrame(loop); });
+  audio.addEventListener('pause', ()=>{ if(rafId) { cancelAnimationFrame(rafId); rafId=null; } });
+  audio.addEventListener('loadedmetadata', updMainTime);
+  audio.addEventListener('timeupdate', updMainTime);
+  audio.addEventListener('ended', ()=>{
+    if(autoAdvance.checked){
+      const next = state.currentIndex + 1;
+      if(state.tracks[next]){ selectIndex(next); play(); }
+      else { stop(); }
+    }else{ stop(); }
+  });
+
+  // ===== BGM Transport & Events =====
+  async function bgmPlay(){
+    ensureCtx(); if(!ctx) return;
+    await ctx.resume();
+    if (!bgmStartFromZero.checked) { rampGain(bgmGain, Number(bgmVolume.value), 0); }
+
+    const tr = state.bgmTracks[state.currentBgmIndex];
+    if(tr && tr.cueIn != null && bgm.currentTime < tr.cueIn) { bgm.currentTime = tr.cueIn; }
+
+    try {
+      await bgm.play();
+      bgmPlayPauseBtn.textContent = '⏸️ BGM停止'; bgmPlayPauseBtn.classList.remove('ok');
+    } catch(e) { alert('BGM再生失敗: '+e.message); }
+  }
+  function bgmPause(){
+    bgm.pause();
+    bgmPlayPauseBtn.textContent = '▶️ BGM再生'; bgmPlayPauseBtn.classList.add('ok');
+  }
+  function bgmStop(){
+    bgmPause();
+    bgm.currentTime = 0;
+  }
+  function bgmFadeTo(target, sec, {stopAfter=false}={}){
+    rampGain(bgmGain, target, Number(sec));
+    if(stopAfter && target <= 0.001){
+      setTimeout(()=>{ bgmStop(); }, (Number(sec))*1000 + 50);
+    }
   }
 
-  function setBgmVol(v){
+  function updBgmTime(){
+    const d = bgm.duration||0, c = bgm.currentTime||0;
+    bgmElapsedEl.textContent = formatTime(c);
+    bgmDurationEl.textContent = formatTime(d);
+    bgmRemainingEl.textContent = formatTime(Math.max(0, d-c));
+    bgmProgressBar.style.width = `${d ? (c/d*100) : 0}%`;
+  }
+  function checkBgmCueAutoStop(){
+    const tr = state.bgmTracks[state.currentBgmIndex];
+    if(!tr) return;
+    if(bgmAutoStopAtOut.checked && tr.cueOut != null){
+      const remain = tr.cueOut - bgm.currentTime;
+      if(remain <= 0.05){ bgmStop(); }
+      else if(remain > 0 && remain < 0.3){
+        const sec = Math.max(0.15, Number(bgmFadeOutSec.value));
+        bgmFadeTo(0, Math.min(sec, remain + 0.05), {stopAfter:true});
+      }
+    }
+  }
+  
+  bgmPlayPauseBtn.addEventListener('click', ()=> bgm.paused ? bgmPlay() : bgmPause());
+  bgmStopBtn.addEventListener('click', bgmStop);
+  bgmPrevBtn.addEventListener('click', () => { if (state.currentBgmIndex > 0) selectBgmIndex(state.currentBgmIndex - 1); });
+  bgmNextBtn.addEventListener('click', () => { if (state.currentBgmIndex < state.bgmTracks.length - 1) selectBgmIndex(state.currentBgmIndex + 1); });
+  
+  bgmFadeInBtn.addEventListener('click', ()=>{
+    if(bgm.paused) bgmPlay();
+    if(bgmStartFromZero.checked) rampGain(bgmGain, 0, 0);
+    rampGain(bgmGain, Number(bgmVolume.value), Number(bgmFadeInSec.value));
+  });
+  bgmFadeOutBtn.addEventListener('click', ()=> bgmFadeTo(0, Number(bgmFadeOutSec.value)) );
+  bgmFadeStopBtn.addEventListener('click', ()=> bgmFadeTo(0, Number(bgmFadeOutSec.value), {stopAfter:true}) );
+
+  function setBgmVol(v, save=true){
     ensureCtx();
     const val = clamp01(v);
-    bgmGain.gain.value = val;
+    if(bgmGain) bgmGain.gain.value = val;
     bgmVolume.value = String(val);
-    bgmVolNum.value = String(Math.round(val * 100));
+    bgmVolNum.value = String(Math.round(val*100));
+    if(save) saveSettings();
   }
-
-  // ===== Event Listeners =====
-
-  // Tab switching
-  $('.tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      const tabName = tab.dataset.tab;
-      $('.tab').forEach(t => t.classList.remove('active'));
-      $('.tab-content').forEach(c => c.classList.remove('active'));
-      tab.classList.add('active');
-      $(`[data-content="${tabName}"]`).classList.add('active');
-      state.activeTab = tabName;
-    });
-  });
-
-  // Main transport
-  playPauseBtn.addEventListener('click', ()=> audio.paused ? play() : pause());
-  stopBtn.addEventListener('click', stop);
-  seekBackBtn.addEventListener('click', ()=>{ audio.currentTime = Math.max(0, (audio.currentTime||0) - 5); });
-  seekFwdBtn.addEventListener('click', ()=>{ const d = audio.duration||0; audio.currentTime = Math.min(d, (audio.currentTime||0) + 5); });
-  prevBtn.addEventListener('click', ()=>{ const p = state.currentIndex - 1; if(state.tracks[p]){ selectIndex(p); play(); } });
-  nextBtn.addEventListener('click', ()=>{ const n = state.currentIndex + 1; if(state.tracks[n]){ selectIndex(n); play(); } });
-
-  // Main fade controls
-  fadeInBtn.addEventListener('click', ()=>{
-    if(audio.paused) play();
-    const sec = Number(fadeInSec.value) || 0;
-    if(startFromZero.checked) rampGain(mainGain, 0, 0);
-    rampGain(mainGain, 1, sec);
-  });
-  fadeOutBtn.addEventListener('click', ()=> fadeMainTo(0, Number(fadeOutSec.value) || 0));
-  fadeStopBtn.addEventListener('click', ()=> fadeMainTo(0, Number(fadeOutSec.value) || 0, {stopAfter:true}));
-
-  // Main volume controls
-  volumeSlider.addEventListener('input', ()=> setMainVol(Number(volumeSlider.value)));
-  volNum.addEventListener('input', ()=> setMainVol(Number(volNum.value) / 100));
-  volDown.addEventListener('click', ()=> setMainVol((mainGain?.gain.value || 1) - 0.05));
-  volUp.addEventListener('click', ()=> setMainVol((mainGain?.gain.value || 1) + 0.05));
-  muteBtn.addEventListener('click', ()=> setMainVol((mainGain?.gain.value || 1) > 0 ? 0 : 1));
-
-  // BGM controls
-  bgmPlayBtn.addEventListener('click', ()=> bgm.paused ? playBgm() : pauseBgm());
-  bgmPauseBtn.addEventListener('click', pauseBgm);
-  bgmFadeInBtn.addEventListener('click', ()=> {
-    if(bgm.paused) playBgm();
-    fadeBgmTo(bgmGain?.gain.value > 0 ? bgmGain.gain.value : 0.5, Number(bgmFadeInSec.value) || 0);
-  });
-  bgmFadeOutBtn.addEventListener('click', ()=> fadeBgmTo(0, Number(bgmFadeOutSec.value) || 0));
-
-  // BGM volume controls
-  bgmVolume.addEventListener('input', ()=> setBgmVol(Number(bgmVolume.value)));
-  bgmVolNum.addEventListener('input', ()=> setBgmVol(Number(bgmVolNum.value) / 100));
-  bgmVolDown.addEventListener('click', ()=> setBgmVol((bgmGain?.gain.value || 0.5) - 0.05));
-  bgmVolUp.addEventListener('click', ()=> setBgmVol((bgmGain?.gain.value || 0.5) + 0.05));
-  bgmMuteBtn.addEventListener('click', ()=> setBgmVol((bgmGain?.gain.value || 0.5) > 0 ? 0 : 1));
-
-  bgmLoop.addEventListener('change', ()=> bgm.loop = bgmLoop.checked);
-
-  // Progress seeking
-  progress.addEventListener('click', (e)=>{
-    const rect = progress.getBoundingClientRect();
-    const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-    if(isFinite(audio.duration)) audio.currentTime = ratio * audio.duration;
-  });
+  bgmVolume.addEventListener('input', ()=> setBgmVol(Number(bgmVolume.value)) );
+  bgmVolNum.addEventListener('input', ()=> setBgmVol(Number(bgmVolNum.value)/100));
+  bgmVolDown.addEventListener('click', ()=> setBgmVol(bgmGain.gain.value - 0.05) );
+  bgmVolUp.addEventListener('click', ()=> setBgmVol(bgmGain.gain.value + 0.05) );
 
   bgmProgress.addEventListener('click', (e)=>{
     const r = bgmProgress.getBoundingClientRect();
@@ -929,93 +860,51 @@
     if(isFinite(bgm.duration)) bgm.currentTime = ratio * bgm.duration;
   });
 
-  // Cue controls
-  setInBtn.addEventListener('click', ()=>{
-    const tr = state.tracks[state.currentIndex];
-    if(!tr) return;
-    tr.cueIn = Math.floor(audio.currentTime);
-    inTimeEl.textContent = formatTime(tr.cueIn);
-    saveUrls();
-  });
-  setOutBtn.addEventListener('click', ()=>{
-    const tr = state.tracks[state.currentIndex];
-    if(!tr) return;
-    tr.cueOut = Math.floor(audio.currentTime);
-    outTimeEl.textContent = formatTime(tr.cueOut);
-    saveUrls();
-  });
-  goInBtn.addEventListener('click', ()=>{
-    const tr = state.tracks[state.currentIndex];
-    if(tr && tr.cueIn != null){ audio.currentTime = tr.cueIn; }
-  });
-  clearCueBtn.addEventListener('click', ()=>{
-    const tr = state.tracks[state.currentIndex];
-    if(!tr) return;
-    tr.cueIn = null;
-    tr.cueOut = null;
-    inTimeEl.textContent = '—';
-    outTimeEl.textContent = '—';
-    saveUrls();
-  });
+  bgmSetInBtn.addEventListener('click', ()=>{ const tr = state.bgmTracks[state.currentBgmIndex]; if(!tr) return; tr.cueIn = Math.floor(bgm.currentTime); renderPlaylists(); saveSettings(); });
+  bgmSetOutBtn.addEventListener('click', ()=>{ const tr = state.bgmTracks[state.currentBgmIndex]; if(!tr) return; tr.cueOut = Math.floor(bgm.currentTime); renderPlaylists(); saveSettings(); });
+  bgmGoInBtn.addEventListener('click', ()=>{ const tr = state.bgmTracks[state.currentBgmIndex]; if(tr && tr.cueIn!=null){ bgm.currentTime = tr.cueIn; }});
+  bgmClearCueBtn.addEventListener('click', ()=>{ const tr = state.bgmTracks[state.currentBgmIndex]; if(!tr) return; tr.cueIn=null; tr.cueOut=null; renderPlaylists(); saveSettings(); });
+  bgm.addEventListener('loadedmetadata', updBgmTime);
+  bgm.addEventListener('timeupdate', updBgmTime);
+  bgm.addEventListener('play', () => { bgmPlayPauseBtn.textContent = '⏸️ BGM停止'; bgmPlayPauseBtn.classList.remove('ok'); });
+  bgm.addEventListener('pause', () => { bgmPlayPauseBtn.textContent = '▶️ BGM再生'; bgmPlayPauseBtn.classList.add('ok'); });
 
-  // File/URL management
+  // ===== Left Panel Logic (Tabs, D&D, etc) =====
+  tabPlaylist.addEventListener('click', () => {
+    tabPlaylist.classList.add('active'); tabBgm.classList.remove('active');
+    playlistContainer.classList.remove('hidden'); bgmPlaylistContainer.classList.add('hidden');
+  });
+  tabBgm.addEventListener('click', () => {
+    tabBgm.classList.add('active'); tabPlaylist.classList.remove('active');
+    bgmPlaylistContainer.classList.remove('hidden'); playlistContainer.classList.add('hidden');
+  });
   addFilesBtn.addEventListener('click', ()=> fileInput.click());
   fileInput.addEventListener('change', (e)=> addFiles(e.target.files));
   addUrlBtn.addEventListener('click', addUrlPrompt);
   clearListBtn.addEventListener('click', ()=>{
-    state.tracks.forEach(t=>{ if(t.kind==='local' && t.url.startsWith('blob:')) try{URL.revokeObjectURL(t.url);}catch{} });
-    state.tracks.length = 0;
-    state.currentIndex = -1;
-    audio.src = '';
-    renderPlaylist();
-    saveUrls();
-  });
-
-  bgmAddFilesBtn.addEventListener('click', ()=> bgmFileInput.click());
-  bgmFileInput.addEventListener('change', (e)=> addBgmFiles(e.target.files));
-  bgmAddUrlBtn.addEventListener('click', addBgmUrlPrompt);
-  bgmClearListBtn.addEventListener('click', ()=>{
-    state.bgmTracks.forEach(t=>{ if(t.kind==='local' && t.url.startsWith('blob:')) try{URL.revokeObjectURL(t.url);}catch{} });
-    state.bgmTracks.length = 0;
-    state.currentBgmIndex = -1;
-    bgm.src = '';
-    renderBgmPlaylist();
-    saveBgmUrls();
+    const isBgmActive = !bgmPlaylistContainer.classList.contains('hidden');
+    const targetArray = isBgmActive ? state.bgmTracks : state.tracks;
+    const repoTracks = targetArray.filter(t => t.kind === 'repo');
+    targetArray.forEach(t=>{ if(t.kind==='local' && t.url.startsWith('blob:')) try{URL.revokeObjectURL(t.url);}catch{} });
+    
+    if (isBgmActive) {
+      state.bgmTracks = repoTracks;
+      selectBgmIndex(0);
+    } else {
+      state.tracks = repoTracks;
+      selectIndex(0);
+    }
+    renderPlaylists(); saveSettings();
   });
   dropzone.addEventListener('dragover', (e)=>{ e.preventDefault(); dropzone.classList.add('dragging'); });
   dropzone.addEventListener('dragleave', ()=> dropzone.classList.remove('dragging'));
   dropzone.addEventListener('drop', (e)=>{ e.preventDefault(); dropzone.classList.remove('dragging'); addFiles(e.dataTransfer.files); });
+  search.addEventListener('input', ()=> renderPlaylists() );
+  
+  // Save settings on any input/toggle change
+  document.querySelectorAll('input[type="number"], input[type="checkbox"]').forEach(el => el.addEventListener('change', saveSettings));
 
-  bgmDropzone.addEventListener('dragover', (e)=>{ e.preventDefault(); bgmDropzone.classList.add('dragging'); });
-  bgmDropzone.addEventListener('dragleave', ()=> bgmDropzone.classList.remove('dragging'));
-  bgmDropzone.addEventListener('drop', (e)=>{ e.preventDefault(); bgmDropzone.classList.remove('dragging'); addBgmFiles(e.dataTransfer.files); });
-
-  // Search
-  search.addEventListener('input', ()=>{ state.filter = search.value; renderPlaylist(); });
-  bgmSearch.addEventListener('input', ()=>{ state.bgmFilter = bgmSearch.value; renderBgmPlaylist(); });
-
-  // Duck controls
-  duckEnable.addEventListener('change', ()=> state.duck.enable = duckEnable.checked);
-
-  // Audio events
-  audio.addEventListener('play', startLoop);
-  audio.addEventListener('pause', stopLoop);
-  audio.addEventListener('timeupdate', updateTime);
-  audio.addEventListener('loadedmetadata', updateTime);
-  audio.addEventListener('ended', ()=>{
-    if(autoAdvance.checked){
-      const next = state.currentIndex + 1;
-      if(state.tracks[next]){ selectIndex(next); play(); }
-      else { stop(); }
-    } else {
-      stop();
-    }
-  });
-
-  bgm.addEventListener('timeupdate', updateTime);
-  bgm.addEventListener('loadedmetadata', updateTime);
-
-  // Wake Lock
+  // ===== Global Controls (Panic, WakeLock) =====
   async function requestWakeLock(){
     if(!('wakeLock' in navigator)) return;
     try{
@@ -1024,35 +913,160 @@
       wakeLockToggle.checked = true;
     }catch(e){ console.warn('WakeLock failed', e); }
   }
-  function releaseWakeLock(){ try{ state.wakeLock && state.wakeLock.release(); }catch{} finally{ state.wakeLock=null; wakeLockToggle.checked=false; saveConfig(); } }
+  function releaseWakeLock(){ try{ state.wakeLock?.release(); }catch{} finally{ state.wakeLock=null; wakeLockToggle.checked=false; } }
   wakeLockToggle.addEventListener('change', ()=>{ wakeLockToggle.checked ? requestWakeLock() : releaseWakeLock(); });
   document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && wakeLockToggle.checked) requestWakeLock(); });
+  panicBtn.addEventListener('click', ()=>{ rampGain(mainGain, 0, 0.2); rampGain(bgmGain, 0, 0.2); setTimeout(()=>{ stop(); bgmStop(); }, 250); });
+  
+  // ===== Settings Export/Import =====
+  function exportSettings() {
+    saveSettings(); // Ensure latest state is captured
+    const settingsString = localStorage.getItem(SETTINGS_KEY);
+    if (!settingsString) {
+        alert("保存する設定がありません。");
+        return;
+    }
+    const blob = new Blob([settingsString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'soundboard-settings.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
 
-  // Panic button
-  panicBtn.addEventListener('click', ()=>{
-    rampGain(mainGain, 0, 0.2);
-    rampGain(bgmGain, 0, 0.2);
-    setTimeout(()=>{
-      audio.pause();
-      audio.currentTime = 0;
-      bgm.pause();
-      playPauseBtn.textContent = '▶ 再生';
-      playPauseBtn.classList.add('primary');
-      bgmPlayBtn.textContent = '▶ 再生';
-      bgmPlayBtn.classList.add('purple');
-    }, 220);
-  });
+  function importSettings(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const settings = JSON.parse(e.target.result);
+            applySettings(settings);
+            localStorage.setItem(SETTINGS_KEY, e.target.result); // Save imported settings
+            alert("設定をインポートしました。");
+        } catch (err) {
+            console.error("設定ファイルの読み込みに失敗しました:", err);
+            alert("設定ファイルの形式が正しくありません。");
+        }
+    };
+    reader.readAsText(file);
+    event.target.value = ''; // Reset file input
+  }
+  
+  exportSettingsBtn.addEventListener('click', exportSettings);
+  importSettingsBtn.addEventListener('click', () => importFile.click());
+  importFile.addEventListener('change', importSettings);
 
-  // ===== Initialization =====
-  restoreUrls();
-  restoreBgmUrls();
-  renderPlaylist();
-  renderBgmPlaylist();
-  setMainVol(1);
-  setBgmVol(0.5);
-  bgm.loop = true;
-  startLoop();
+  // ===== GitHub Loader & Initialization =====
+  async function loadPlaylistFromGitHub(){
+    const host = window.location.hostname;
+    const pathParts = window.location.pathname.split('/').filter(p => p);
+    if(!host.endsWith('github.io')){ console.warn("GitHub Pagesではないため、自動読み込みをスキップします。"); return null; }
+    
+    const owner = host.split('.')[0];
+    const repo = pathParts.length > 0 ? pathParts[0] : `${owner}.github.io`;
+    if(!owner || !repo){ console.error("リポジトリ情報を取得できませんでした。"); return null; }
 
+    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/audio`;
+    try {
+      const res = await fetch(apiUrl);
+      if(!res.ok) throw new Error(`GitHub APIエラー (${res.status})。'audio'フォルダとリポジトリの公開設定を確認してください。`);
+      const files = await res.json();
+      const audioExtensions = ['.mp3', '.wav', '.ogg', '.flac', '.m4a', '.aac'];
+      return files
+        .filter(f => f.type === 'file' && audioExtensions.some(ext => f.name.toLowerCase().endsWith(ext)))
+        .map(f => ({ name: f.name.replace(/\.[^/.]+$/, ""), path: f.path }));
+    } catch(e) { console.error(e); alert(e.message); return null; }
+  }
+
+  function applySettings(settings) {
+    // Restore volumes, toggles, etc.
+    setMainVol(settings.volumes?.main ?? 1, false);
+    setBgmVol(settings.volumes?.bgm ?? 0.5, false);
+    if (settings.toggles) {
+        autoAdvance.checked = !!settings.toggles.autoAdvance; playFromIn.checked = !!settings.toggles.playFromIn;
+        autoStopAtOut.checked = !!settings.toggles.autoStopAtOut; bgmLoop.checked = !!settings.toggles.bgmLoop;
+        bgmAutoStopAtOut.checked = !!settings.toggles.bgmAutoStopAtOut; duckEnable.checked = !!settings.toggles.duckEnable;
+        startFromZero.checked = !!settings.toggles.mainStartFromZero; bgmStartFromZero.checked = !!settings.toggles.bgmStartFromZero;
+    }
+    if (settings.fadeSec) {
+        fadeInSec.value = settings.fadeSec.mainIn; fadeOutSec.value = settings.fadeSec.mainOut;
+        bgmFadeInSec.value = settings.fadeSec.bgmIn; bgmFadeOutSec.value = settings.fadeSec.bgmOut;
+    }
+    if (settings.duckParams) {
+        duckTarget.value = settings.duckParams.target; duckSec.value = settings.duckParams.duck; unduckSec.value = settings.duckParams.unduck;
+    }
+    
+    // Reorder playlists based on settings
+    const allAvailableTracks = [...state.tracks, ...state.bgmTracks].reduce((map, track) => {
+        if (!map.has(track.path)) { map.set(track.path, track); }
+        return map;
+    }, new Map());
+
+    if (settings.playlistOrder) {
+        state.tracks = settings.playlistOrder.map(path => allAvailableTracks.get(path)).filter(Boolean);
+    }
+    if (settings.bgmPlaylistOrder) {
+        state.bgmTracks = settings.bgmPlaylistOrder.map(path => allAvailableTracks.get(path)).filter(Boolean);
+    }
+    
+    // Apply cue points
+    const allTracks = [...state.tracks, ...state.bgmTracks];
+    if (settings.trackData) {
+        allTracks.forEach(t => {
+            const savedData = settings.trackData[t.path];
+            if (savedData) {
+                t.cueIn = savedData.cueIn ?? null;
+                t.cueOut = savedData.cueOut ?? null;
+            }
+        });
+    }
+
+    // Select tracks
+    selectIndex(0);
+    const bgmIdx = state.bgmTracks.findIndex(t => t.path === settings.currentBgmPath);
+    selectBgmIndex(Math.max(0, bgmIdx));
+
+    renderPlaylists();
+  }
+
+  async function initialize(){
+    const githubFiles = await loadPlaylistFromGitHub() || [];
+    const baseTracks = githubFiles.map(item => ({
+        id: crypto.randomUUID(), name: item.name, url: item.path, path: item.path,
+        kind: 'repo', cueIn: null, cueOut: null
+    }));
+
+    // Initially, both lists have the same available tracks
+    state.tracks = [...baseTracks];
+    state.bgmTracks = [...baseTracks];
+
+    const settings = loadSettings();
+    if (settings) {
+        applySettings(settings);
+    } else {
+        // Default selection if no settings
+        selectIndex(0);
+        selectBgmIndex(0);
+        renderPlaylists();
+    }
+    
+    let rafId = null;
+    function loop(){ 
+      updMainTime(); 
+      updLevel();
+      updBgmTime();
+      checkCueOutAutoStop();
+      checkBgmCueAutoStop();
+      rafId = requestAnimationFrame(loop); 
+    }
+    requestAnimationFrame(loop);
+  }
+
+  initialize();
 })();
 </script>
 </body>
