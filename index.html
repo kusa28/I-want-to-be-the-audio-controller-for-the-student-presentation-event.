@@ -23,6 +23,7 @@
   .btn.primary{background:var(--accent);border-color:transparent;color:#0b1020}
   .btn.danger{background:var(--danger);border-color:transparent;color:#0b1020}
   .btn.ok{background:var(--ok);border-color:transparent;color:#0b1020}
+  select.btn{padding-right:32px; -webkit-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%23e8eaf0' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right .5rem center; background-size: 1.5em 1.5em;}
   input[type="number"],input[type="text"],input[type="url"]{background:#0e1220;border:1px solid var(--border);color:var(--fg);border-radius:10px;padding:12px 10px;font-size:16px}
   input[type="range"]{width:100%; touch-action: none;}
   small.mono{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--muted)}
@@ -99,10 +100,14 @@
       <div class="row" style="justify-content:space-between;align-items:flex-end">
         <div>
           <strong>🎵 BGM（常時ループ用&個別操作）</strong>
-          <div class="row" style="margin-top:6px">
+          <div class="row" style="margin-top:6px; flex-wrap:wrap;">
+            <label class="row" style="flex-grow:1; min-width: 200px;">
+               <small>リポジトリBGM:</small>
+               <select id="bgmSelectRepo" class="btn" style="flex:1; padding: 10px 12px;"><option value="">選択してください...</option></select>
+            </label>
             <input id="bgmFileInput" type="file" accept="audio/*" style="display:none"/>
-            <button id="bgmAddFile" class="btn">📁 BGMファイル</button>
-            <button id="bgmAddUrl" class="btn">🌐 BGM URL</button>
+            <button id="bgmAddFile" class="btn" title="ローカルファイル選択">📁</button>
+            <button id="bgmAddUrl" class="btn" title="URLから追加">🌐</button>
             <label class="toggle" style="margin-left:8px"><input id="bgmLoop" type="checkbox" checked><span>ループ</span></label>
           </div>
           <div style="margin-top:6px"><small class="mono" id="bgmTitle">BGM: —</small></div>
@@ -253,7 +258,7 @@
       <details class="panel" open style="background:#121722;margin-top:8px">
         <summary>ℹ️ ヒント</summary>
         <div style="margin-top:6px;color:var(--muted);font-size:14px">
-          ・GitHub Pagesで利用する場合、リポジトリの`audio`フォルダに音声ファイルを入れるだけで自動でプレイリストに追加されます。<br>
+          ・GitHub Pagesで利用する場合、リポジトリの`audio`フォルダに音声ファイルを入れるだけで自動でプレイリストとBGM選択肢に追加されます。<br>
           ・リポジトリは公開設定にしてください。<br>
           ・各曲のIN/OUT点や音量設定は自動でブラウザに保存されます。<br>
           ・iPad完全タッチ操作OK<br>
@@ -384,6 +389,7 @@
   const bgmAddFile = $('#bgmAddFile');
   const bgmFileInput = $('#bgmFileInput');
   const bgmAddUrl = $('#bgmAddUrl');
+  const bgmSelectRepo = $('#bgmSelectRepo');
   const bgmPlayBtn = $('#bgmPlay');
   const bgmPauseBtn = $('#bgmPause');
   const bgmStopBtn = $('#bgmStop');
@@ -434,9 +440,13 @@
           trackSettings[t.path] = { cueIn: t.cueIn, cueOut: t.cueOut };
         }
       });
+      // BGMの設定も保存キーをpathにする
+      if (state.bgm.path) {
+        trackSettings[state.bgm.path] = { cueIn: state.bgm.cueIn, cueOut: state.bgm.cueOut };
+      }
       const settings = {
         tracks: trackSettings,
-        bgm: state.bgm,
+        bgmPath: state.bgm.path, // BGMのパスだけ別途保存
         volumes: { main: mainGain?.gain.value ?? 1, bgm: bgmGain?.gain.value ?? 0.5 },
         toggles: {
           autoAdvance: autoAdvance.checked, playFromIn: playFromIn.checked, autoStopAtOut: autoStopAtOut.checked,
@@ -692,11 +702,16 @@
     saveSettings();
   }
   function setBgmVolByPercent(p){ setBgmVol((Math.max(0, Math.min(100, Number(p)))||0)/100); }
-  function setBgmFile(url, name){
+  function setBgmFile(url, name, settings){
       bgm.src = url;
       bgm.load();
       bgmTitle.textContent = 'BGM: ' + name;
-      state.bgm.path = url; // ローカルファイルの場合はblob URLが入るが、これは保存しても復元不能
+      state.bgm.path = url;
+      // 曲ごとのキューポイントを復元
+      state.bgm.cueIn = settings?.cueIn ?? null;
+      state.bgm.cueOut = settings?.cueOut ?? null;
+      bgmInTimeEl.textContent = state.bgm.cueIn != null ? formatTime(state.bgm.cueIn) : '—';
+      bgmOutTimeEl.textContent = state.bgm.cueOut != null ? formatTime(state.bgm.cueOut) : '—';
       saveSettings();
   }
 
@@ -742,12 +757,22 @@
     const f = e.target.files?.[0]; if(!f) return;
     const url = URL.createObjectURL(f);
     setBgmFile(url, f.name);
+    bgmSelectRepo.value = ''; // リポジトリ選択を解除
   });
   bgmAddUrl.addEventListener('click', ()=>{
     const url = prompt('BGMのURL (CORS許可が必要な場合あり)');
     if(!url) return;
     setBgmFile(url, url.split('/').pop() || url);
+    bgmSelectRepo.value = ''; // リポジトリ選択を解除
   });
+  bgmSelectRepo.addEventListener('change', () => {
+    const path = bgmSelectRepo.value;
+    if (!path) return;
+    const name = bgmSelectRepo.options[bgmSelectRepo.selectedIndex].textContent;
+    const savedSettings = loadSettings()?.tracks?.[path];
+    setBgmFile(path, name, savedSettings);
+  });
+
   bgmLoop.addEventListener('change', ()=> { bgm.loop = bgmLoop.checked; saveSettings(); } );
 
   bgmPlayBtn.addEventListener('click', bgmPlay);
@@ -776,155 +801,4 @@
   bgmSetInBtn.addEventListener('click', ()=>{ state.bgm.cueIn = Math.floor(bgm.currentTime||0); bgmInTimeEl.textContent = formatTime(state.bgm.cueIn); saveSettings(); });
   bgmSetOutBtn.addEventListener('click', ()=>{ state.bgm.cueOut = Math.floor(bgm.currentTime||0); bgmOutTimeEl.textContent = formatTime(state.bgm.cueOut); saveSettings(); });
   bgmGoInBtn.addEventListener('click', ()=>{ if(state.bgm.cueIn!=null){ bgm.currentTime = state.bgm.cueIn; }});
-  bgmClearCueBtn.addEventListener('click', ()=>{ state.bgm.cueIn=null; state.bgm.cueOut=null; bgmInTimeEl.textContent='—'; bgmOutTimeEl.textContent='—'; saveSettings(); });
-
-  bgm.addEventListener('loadedmetadata', updBgmTime);
-  bgm.addEventListener('timeupdate', updBgmTime);
-
-  // ===== Left panel controls =====
-  addFilesBtn.addEventListener('click', ()=> fileInput.click());
-  fileInput.addEventListener('change', (e)=> addFiles(e.target.files));
-  addUrlBtn.addEventListener('click', addUrlPrompt);
-  clearListBtn.addEventListener('click', ()=>{
-    const repoTracks = state.tracks.filter(t => t.kind === 'repo');
-    state.tracks.forEach(t=>{ if(t.kind==='local' && t.url.startsWith('blob:')) try{URL.revokeObjectURL(t.url);}catch{} });
-    state.tracks = repoTracks; // GitHubから読み込んだ曲は残す
-    state.currentIndex = -1;
-    audio.src=''; selectIndex(0); renderPlaylist(); saveSettings();
-  });
-  dropzone.addEventListener('dragover', (e)=>{ e.preventDefault(); dropzone.classList.add('dragging'); });
-  dropzone.addEventListener('dragleave', ()=> dropzone.classList.remove('dragging'));
-  dropzone.addEventListener('drop', (e)=>{ e.preventDefault(); dropzone.classList.remove('dragging'); addFiles(e.dataTransfer.files); });
-  search.addEventListener('input', ()=> renderPlaylist() );
-  
-  // Save settings on toggle/input change
-  [autoAdvance, playFromIn, autoStopAtOut, bgmLoop, bgmAutoStopAtOut, duckEnable].forEach(el => el.addEventListener('change', saveSettings));
-  [fadeInSec, fadeOutSec, bgmFadeInSec, bgmFadeOutSec, duckTarget, duckSec, unduckSec].forEach(el => el.addEventListener('input', saveSettings));
-
-
-  // ===== WakeLock / Panic =====
-  async function requestWakeLock(){
-    if(!('wakeLock' in navigator)) return;
-    try{
-      state.wakeLock = await navigator.wakeLock.request('screen');
-      state.wakeLock.addEventListener('release', ()=>{ wakeLockToggle.checked = false; });
-      wakeLockToggle.checked = true;
-    }catch(e){ console.warn('WakeLock failed', e); }
-  }
-  function releaseWakeLock(){ try{ state.wakeLock && state.wakeLock.release(); }catch{} finally{ state.wakeLock=null; wakeLockToggle.checked=false; } }
-  wakeLockToggle.addEventListener('change', ()=>{ wakeLockToggle.checked ? requestWakeLock() : releaseWakeLock(); });
-  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && wakeLockToggle.checked) requestWakeLock(); });
-
-  panicBtn.addEventListener('click', ()=>{ rampGain(mainGain, 0, 0.2); rampGain(bgmGain, 0, 0.2); setTimeout(()=>{ audio.pause(); audio.currentTime = 0; bgm.pause(); }, 220); });
-
-  // ===== Init & GitHub Playlist Loader =====
-  
-  /**
-   * GitHubリポジトリの 'audio' フォルダから音声ファイルを読み込む
-   */
-  async function loadPlaylistFromGitHub(){
-    // GitHub PagesのURLからユーザー名とリポジトリ名を取得
-    const host = window.location.hostname;
-    const path = window.location.pathname;
-    
-    // この方法は 'username.github.io/repo/' 形式のURLでのみ動作
-    if(!host.endsWith('github.io')){
-      console.warn("GitHub PagesのURLではないため、プレイリストの自動読み込みをスキップします。");
-      return;
-    }
-    
-    const owner = host.split('.')[0];
-    const repo = path.split('/')[1];
-
-    if(!owner || !repo){
-      console.error("ユーザー名またはリポジトリ名を取得できませんでした。");
-      return;
-    }
-
-    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/audio`;
-    console.log(`Fetching playlist from: ${apiUrl}`);
-
-    try {
-      const res = await fetch(apiUrl);
-      if(!res.ok) throw new Error(`GitHub APIの呼び出しに失敗 (${res.status})。'audio'フォルダが存在し、リポジトリが公開されているか確認してください。`);
-      
-      const files = await res.json();
-      const audioExtensions = ['.mp3', '.wav', '.ogg', '.flac', '.m4a', '.aac'];
-      
-      const audioFiles = files
-        .filter(file => file.type === 'file' && audioExtensions.some(ext => file.name.toLowerCase().endsWith(ext)))
-        .map(file => ({
-          name: file.name.replace(/\.[^/.]+$/, ""), // 拡張子を削除
-          path: file.path, // 'audio/filename.mp3'
-        }));
-
-      return audioFiles;
-
-    } catch(e) {
-      console.error(e);
-      alert(e.message);
-      return [];
-    }
-  }
-
-  async function initialize(){
-    const settings = loadSettings();
-    
-    // Restore settings
-    if(settings){
-      setMainVol(settings.volumes?.main ?? 1);
-      setBgmVol(settings.volumes?.bgm ?? 0.5);
-      if(settings.toggles){
-        autoAdvance.checked = settings.toggles.autoAdvance; playFromIn.checked = settings.toggles.playFromIn; autoStopAtOut.checked = settings.toggles.autoStopAtOut;
-        bgmLoop.checked = settings.toggles.bgmLoop; bgm.loop = bgmLoop.checked; bgmAutoStopAtOut.checked = settings.toggles.bgmAutoStopAtOut;
-        duckEnable.checked = settings.toggles.duckEnable;
-      }
-      if(settings.fadeSec){
-        fadeInSec.value = settings.fadeSec.mainIn; fadeOutSec.value = settings.fadeSec.mainOut;
-        bgmFadeInSec.value = settings.fadeSec.bgmIn; bgmFadeOutSec.value = settings.fadeSec.bgmOut;
-      }
-      if(settings.duckParams){
-        duckTarget.value = settings.duckParams.target; duckSec.value = settings.duckParams.duck; unduckSec.value = settings.duckParams.unduck;
-      }
-      if(settings.bgm && settings.bgm.path){
-        state.bgm = settings.bgm; bgm.src = state.bgm.path; bgm.load();
-        bgmTitle.textContent = "BGM: " + (state.bgm.path.split('/').pop() || state.bgm.path);
-        bgmInTimeEl.textContent = state.bgm.cueIn != null ? formatTime(state.bgm.cueIn) : '—';
-        bgmOutTimeEl.textContent = state.bgm.cueOut != null ? formatTime(state.bgm.cueOut) : '—';
-      }
-    }
-
-    // Load playlist from GitHub
-    const playlistData = await loadPlaylistFromGitHub();
-
-    if(playlistData){
-      const trackSettings = settings?.tracks || {};
-      playlistData.forEach(item => {
-        const saved = trackSettings[item.path] || {};
-        state.tracks.push({
-          id: crypto.randomUUID(),
-          name: item.name,
-          url: item.path, // URLとPathは同じ
-          path: item.path, // 永続化用のキー
-          kind: 'repo',    // GitHubリポジトリからの曲
-          cueIn: saved.cueIn ?? null,
-          cueOut: saved.cueOut ?? null,
-        });
-      });
-    }
-    
-    if(state.tracks.length > 0){
-      selectIndex(0);
-    } else {
-      renderPlaylist();
-    }
-    
-    requestAnimationFrame(loop);
-  }
-
-  initialize();
-
-})();
-</script>
-</body>
-</html>
+  bgmClearCueBtn.addEventListener('click', ()=>{ state.bgm.cueIn=null; state.bgm.cueOut=null; bgmInTimeEl.textContent='—
