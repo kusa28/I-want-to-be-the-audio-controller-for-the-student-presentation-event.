@@ -23,7 +23,7 @@
   .btn.primary{background:var(--accent);border-color:transparent;color:#0b1020}
   .btn.danger{background:var(--danger);border-color:transparent;color:#0b1020}
   .btn.ok{background:var(--ok);border-color:transparent;color:#0b1020}
-  select.btn{padding-right:32px; -webkit-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%23e8eaf0' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right .5rem center; background-size: 1.5em 1.5em;}
+  .btn-reorder{padding: 2px 8px; font-size: 14px; line-height: 1;}
   input[type="number"],input[type="text"],input[type="url"]{background:#0e1220;border:1px solid var(--border);color:var(--fg);border-radius:10px;padding:12px 10px;font-size:16px}
   input[type="range"]{width:100%; touch-action: none;}
   small.mono{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--muted)}
@@ -32,8 +32,8 @@
   .playlist li{display:flex;align-items:center;gap:8px;padding:10px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;background:#121722}
   .playlist li.active{outline:2px solid var(--accent);background:#141a28}
   .playlist li .name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .reorder-buttons{display:flex; flex-direction:column; gap: 4px; align-items: center; justify-content: center;}
   .badge{font-size:12px;padding:2px 6px;border-radius:999px;border:1px solid var(--border);color:var(--muted)}
-  .drag{cursor:grab;opacity:.85}
   .progress{height:26px;background:#0b0f18;border:1px solid var(--border);border-radius:12px;position:relative;overflow:hidden;cursor:pointer}
   .progress>.bar{position:absolute;top:0;left:0;bottom:0;width:0%;background:linear-gradient(90deg,var(--accent),#a0b7ff)}
   .timer{font-variant-numeric:tabular-nums;font-size:32px;font-weight:900;letter-spacing:.02em}
@@ -443,11 +443,10 @@
   const unduckSec = $('#unduckSec');
 
   // ===== Settings (localStorage) =====
-  const SETTINGS_KEY = 'soundboard.settings.v4'; // version up
+  const SETTINGS_KEY = 'soundboard.settings.v4';
   function saveSettings(){
     try {
       const trackData = {};
-      // ユニークなトラックのみを対象にキュー情報を保存
       const uniqueTracks = new Map();
       [...state.tracks, ...state.bgmTracks].forEach(t => {
           if (t.path && !uniqueTracks.has(t.path)) {
@@ -487,7 +486,6 @@
       const raw = localStorage.getItem(SETTINGS_KEY);
       if(!raw) return null;
       const data = JSON.parse(raw);
-      // 簡単なバージョンチェック
       if (data.version !== 4) {
           console.warn("古いバージョンの設定です。一部が正しく復元されない可能性があります。");
       }
@@ -496,19 +494,27 @@
   }
 
   // ===== Playlist & UI Rendering =====
-  function createPlaylistItem(track, index, isBgm = false) {
+  function createPlaylistItem(track, index, isBgm = false, listLength) {
     const q = (search.value||'').trim().toLowerCase();
     if(q && !track.name.toLowerCase().includes(q)) return null;
     
     const li = document.createElement('li');
-    li.draggable = true;
-    li.dataset.index = String(index);
-
     const isActive = isBgm ? (index === state.currentBgmIndex) : (index === state.currentIndex);
     if(isActive) li.classList.add('active');
     
+    // Conditional buttons
+    const upButton = index > 0 
+        ? `<button class="btn btn-reorder" data-act="move-up" title="上へ">⬆️</button>` 
+        : `<div style="width: 33px;"></div>`; // Placeholder for alignment
+    const downButton = index < listLength - 1
+        ? `<button class="btn btn-reorder" data-act="move-down" title="下へ">⬇️</button>`
+        : `<div style="width: 33px;"></div>`; // Placeholder for alignment
+    
     li.innerHTML = `
-      <span class="badge drag" title="ドラッグで並び替え">↕</span>
+      <div class="reorder-buttons">
+        ${upButton}
+        ${downButton}
+      </div>
       <span class="name" title="タップで選択">${track.name}</span>
       ${track.cueIn!=null ? `<span class="badge">IN ${formatTime(track.cueIn)}</span>`: ''}
       ${track.cueOut!=null ? `<span class="badge">OUT ${formatTime(track.cueOut)}</span>`: ''}
@@ -529,30 +535,26 @@
     });
     li.querySelector('[data-act="remove"]').addEventListener('click', (e) => { e.stopPropagation(); removeAt(index, isBgm); });
     
-    li.addEventListener('dragstart', (e)=>{ e.dataTransfer.setData(JSON.stringify({index, isBgm})); e.dataTransfer.effectAllowed = 'move'; });
-    li.addEventListener('dragover', (e)=>{ e.preventDefault(); e.dataTransfer.dropEffect='move'; });
-    li.addEventListener('drop', (e)=>{
-      e.preventDefault();
-      try {
-        const fromData = JSON.parse(e.dataTransfer.getData('text/plain'));
-        moveItem(fromData.index, index, isBgm);
-      } catch (err) { console.error('Drop failed:', err); }
-    });
+    const upBtn = li.querySelector('[data-act="move-up"]');
+    if (upBtn) upBtn.addEventListener('click', (e) => { e.stopPropagation(); moveItem(index, index - 1, isBgm); });
+    
+    const downBtn = li.querySelector('[data-act="move-down"]');
+    if (downBtn) downBtn.addEventListener('click', (e) => { e.stopPropagation(); moveItem(index, index + 1, isBgm); });
 
     return li;
   }
 
   function renderPlaylists() {
     playlistEl.innerHTML = '';
-    state.tracks.forEach((t, i) => {
-      const li = createPlaylistItem(t, i, false);
+    state.tracks.forEach((t, i, arr) => {
+      const li = createPlaylistItem(t, i, false, arr.length);
       if(li) playlistEl.appendChild(li);
     });
     countBadge.textContent = `${state.tracks.length} 曲`;
 
     bgmPlaylistEl.innerHTML = '';
-    state.bgmTracks.forEach((t, i) => {
-      const li = createPlaylistItem(t, i, true);
+    state.bgmTracks.forEach((t, i, arr) => {
+      const li = createPlaylistItem(t, i, true, arr.length);
       if(li) bgmPlaylistEl.appendChild(li);
     });
     bgmCountBadge.textContent = `${state.bgmTracks.length} 曲`;
@@ -979,20 +981,31 @@
     const repo = pathParts.length > 0 ? pathParts[0] : `${owner}.github.io`;
     if(!owner || !repo){ console.error("リポジトリ情報を取得できませんでした。"); return null; }
 
-    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/audio`;
+    const initialUrl = `https://api.github.com/repos/${owner}/${repo}/contents/audio?per_page=100`;
+    let allFiles = [];
+    let nextUrl = initialUrl;
+
     try {
-      const res = await fetch(apiUrl);
-      if(!res.ok) throw new Error(`GitHub APIエラー (${res.status})。'audio'フォルダとリポジトリの公開設定を確認してください。`);
-      const files = await res.json();
+      while(nextUrl) {
+        const res = await fetch(nextUrl);
+        if(!res.ok) throw new Error(`GitHub APIエラー (${res.status})。'audio'フォルダとリポジトリの公開設定を確認してください。`);
+        
+        const files = await res.json();
+        allFiles.push(...files);
+
+        const linkHeader = res.headers.get('Link');
+        const nextLink = linkHeader?.match(/<([^>]+)>;\s*rel="next"/);
+        nextUrl = nextLink ? nextLink[1] : null;
+      }
+
       const audioExtensions = ['.mp3', '.wav', '.ogg', '.flac', '.m4a', '.aac'];
-      return files
+      return allFiles
         .filter(f => f.type === 'file' && audioExtensions.some(ext => f.name.toLowerCase().endsWith(ext)))
         .map(f => ({ name: f.name.replace(/\.[^/.]+$/, ""), path: f.path }));
     } catch(e) { console.error(e); alert(e.message); return null; }
   }
 
   function applySettings(settings) {
-    // Restore volumes, toggles, etc.
     setMainVol(settings.volumes?.main ?? 1, false);
     setBgmVol(settings.volumes?.bgm ?? 0.5, false);
     if (settings.toggles) {
@@ -1003,7 +1016,7 @@
         wakeLockToggle.checked = !!settings.toggles.wakeLock;
         if(wakeLockToggle.checked) requestWakeLock();
     }
-    bgm.loop = bgmLoop.checked; // BUGFIX: Sync loop property
+    bgm.loop = bgmLoop.checked;
     
     if (settings.fadeSec) {
         fadeInSec.value = settings.fadeSec.mainIn; fadeOutSec.value = settings.fadeSec.mainOut;
@@ -1017,7 +1030,6 @@
         if(settings.ui.activeTab === 'bgm') tabBgm.click(); else tabPlaylist.click();
     }
     
-    // Reorder playlists
     const allAvailableTracks = new Map();
     [...state.tracks, ...state.bgmTracks].forEach(t => {
         if (!allAvailableTracks.has(t.path)) { allAvailableTracks.set(t.path, t); }
@@ -1030,7 +1042,6 @@
         state.bgmTracks = settings.bgmPlaylistOrder.map(path => allAvailableTracks.get(path)).filter(Boolean);
     }
     
-    // Apply cue points
     if (settings.trackData) {
         [...state.tracks, ...state.bgmTracks].forEach(t => {
             const savedData = settings.trackData[t.path];
@@ -1041,7 +1052,6 @@
         });
     }
 
-    // Select tracks
     selectIndex(settings.currentIndex ?? 0, true);
     selectBgmIndex(settings.currentBgmIndex ?? 0, true);
 
@@ -1062,12 +1072,11 @@
     if (settings) {
         applySettings(settings);
     } else {
-        // Default selection if no settings
         selectIndex(0);
         selectBgmIndex(0);
         renderPlaylists();
     }
-    bgm.loop = bgmLoop.checked; // Default loop setting
+    bgm.loop = bgmLoop.checked;
     
     let rafId = null;
     function loop(){ 
