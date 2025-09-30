@@ -15,7 +15,7 @@
   .container{display:grid;grid-template-columns:380px 1fr;gap:12px;padding:12px;min-height:calc(100vh - 56px)}
   @media (max-width: 980px){.container{grid-template-columns:1fr}}
   .panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:12px}
-  #left {display: flex; flex-direction: column;} /* MODIFIED: Make left panel a flex container */
+  #left {display: flex; flex-direction: column;}
   .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .stack{display:grid;gap:8px}
   .btn{background:var(--btn);border:1px solid var(--border);border-radius:14px;padding:12px 16px;color:var(--fg);cursor:pointer;font-weight:800;user-select:none;font-size:16px}
@@ -29,19 +29,19 @@
   input[type="range"]{width:100%; touch-action: none;}
   small.mono{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--muted)}
   .playlist-container{
-    flex-grow: 1; /* MODIFIED: Allow this container to grow */
+    flex-grow: 1;
     display: flex;
     flex-direction: column;
-    min-height: 0; /* MODIFIED: Important for flexible children */
+    min-height: 0;
   } 
   .playlist-container.hidden{display: none;}
   .playlist{
     list-style:none;
     padding:0;
     margin:8px 0 0;
-    flex-grow: 1; /* MODIFIED: Make the list itself grow */
+    flex-grow: 1;
     overflow:auto;
-    min-height: 0; /* MODIFIED: Crucial for scrolling */
+    min-height: 0;
   }
   .playlist li{display:flex;align-items:center;gap:8px;padding:10px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;background:#121722}
   .playlist li.active{outline:2px solid var(--accent);background:#141a28}
@@ -457,7 +457,7 @@
   const unduckSec = $('#unduckSec');
 
   // ===== Settings (localStorage) =====
-  const SETTINGS_KEY = 'soundboard.settings.v4';
+  const SETTINGS_KEY = 'soundboard.settings.v5'; // version up
   function saveSettings(){
     try {
       const trackData = {};
@@ -468,17 +468,17 @@
           }
       });
       uniqueTracks.forEach(t => {
-        trackData[t.path] = { cueIn: t.cueIn, cueOut: t.cueOut };
+        trackData[t.path] = { cueIn: t.cueIn, cueOut: t.cueOut, volume: t.volume };
       });
       
       const settings = {
-        version: 4,
+        version: 5,
         playlistOrder: state.tracks.map(t => t.path).filter(Boolean),
         bgmPlaylistOrder: state.bgmTracks.map(t => t.path).filter(Boolean),
         trackData,
         currentIndex: state.currentIndex,
         currentBgmIndex: state.currentBgmIndex,
-        volumes: { main: mainGain?.gain.value ?? 1, bgm: bgmGain?.gain.value ?? 0.5 },
+        // Global volumes are no longer saved, as they are now per-track
         toggles: {
           wakeLock: wakeLockToggle.checked,
           autoAdvance: autoAdvance.checked, playFromIn: playFromIn.checked, autoStopAtOut: autoStopAtOut.checked,
@@ -500,8 +500,10 @@
       const raw = localStorage.getItem(SETTINGS_KEY);
       if(!raw) return null;
       const data = JSON.parse(raw);
-      if (data.version !== 4) {
+      if (data.version !== 5) {
           console.warn("古いバージョンの設定です。一部が正しく復元されない可能性があります。");
+          localStorage.removeItem(SETTINGS_KEY); // Remove old incompatible settings
+          return null;
       }
       return data;
     } catch(e) { console.warn('設定の読み込みに失敗しました', e); return null; }
@@ -600,6 +602,8 @@
     const tr = state.tracks[idx];
     if(!tr) { titleEl.textContent = '—'; audio.src = ''; return; }
     
+    setMainVol(tr.volume ?? 1.0, false); // NEW: Apply track-specific volume
+    
     titleEl.textContent = tr.name;
     inTimeEl.textContent = tr.cueIn != null ? formatTime(tr.cueIn) : '—';
     outTimeEl.textContent = tr.cueOut != null ? formatTime(tr.cueOut) : '—';
@@ -620,6 +624,8 @@
     
     const tr = state.bgmTracks[idx];
     if(!tr) { bgmTitle.textContent = '—'; bgm.src = ''; return; }
+
+    setBgmVol(tr.volume ?? 1.0, false); // NEW: Apply track-specific volume
 
     bgmTitle.textContent = tr.name;
     bgmInTimeEl.textContent = tr.cueIn != null ? formatTime(tr.cueIn) : '—';
@@ -669,7 +675,7 @@
 
     Array.from(files || []).forEach(f => {
       const url = URL.createObjectURL(f);
-      targetArray.push({id:crypto.randomUUID(), name:f.name, url, kind, path:null, cueIn:null, cueOut:null});
+      targetArray.push({id:crypto.randomUUID(), name:f.name, url, kind, path:null, cueIn:null, cueOut:null, volume: 1.0});
     });
     
     if (isBgmActive) {
@@ -684,7 +690,7 @@
     const name = prompt('曲名 (省略可)') || url.split('/').pop();
     const isBgmActive = !bgmPlaylistContainer.classList.contains('hidden');
     const targetArray = isBgmActive ? state.bgmTracks : state.tracks;
-    targetArray.push({id:crypto.randomUUID(), name, url, kind:'url', path:url, cueIn:null, cueOut:null});
+    targetArray.push({id:crypto.randomUUID(), name, url, kind:'url', path:url, cueIn:null, cueOut:null, volume: 1.0});
 
     if (isBgmActive) {
         if(state.currentBgmIndex < 0) selectBgmIndex(0); else renderPlaylists();
@@ -698,10 +704,12 @@
   async function play(){
     ensureCtx(); if(!ctx) return;
     await ctx.resume();
-    if (!startFromZero.checked) { rampGain(mainGain, Number(volumeSlider.value), 0); }
-
     const tr = state.tracks[state.currentIndex];
-    if(tr && tr.cueIn != null && playFromIn.checked && audio.currentTime < tr.cueIn){ audio.currentTime = tr.cueIn; }
+    if(!tr) return;
+
+    rampGain(mainGain, startFromZero.checked ? 0 : tr.volume, 0);
+
+    if(tr.cueIn != null && playFromIn.checked && audio.currentTime < tr.cueIn){ audio.currentTime = tr.cueIn; }
     
     if(duckEnable.checked){
       state.duck.prevVol = bgmGain.gain.value;
@@ -767,9 +775,10 @@
   nextBtn.addEventListener('click', () => { if (state.currentIndex < state.tracks.length - 1) selectIndex(state.currentIndex + 1); });
   
   fadeInBtn.addEventListener('click', ()=>{
+    const tr = state.tracks[state.currentIndex]; if(!tr) return;
     if(audio.paused) play();
     if(startFromZero.checked) rampGain(mainGain, 0, 0);
-    rampGain(mainGain, Number(volumeSlider.value), Number(fadeInSec.value));
+    rampGain(mainGain, tr.volume, Number(fadeInSec.value));
   });
   fadeOutBtn.addEventListener('click', ()=> fadeMainTo(0, Number(fadeOutSec.value)) );
   fadeStopBtn.addEventListener('click', ()=> fadeMainTo(0, Number(fadeOutSec.value), {stopAfter:true}) );
@@ -786,13 +795,17 @@
     if(mainGain) mainGain.gain.value = val;
     volumeSlider.value = String(val);
     volNum.value = String(Math.round(val*100));
+    
+    const currentTrack = state.tracks[state.currentIndex];
+    if(currentTrack) { currentTrack.volume = val; }
+
     if(save) saveSettings();
   }
   volumeSlider.addEventListener('input', ()=> setMainVol(Number(volumeSlider.value)) );
   volNum.addEventListener('input', ()=> setMainVol(Number(volNum.value)/100));
   volDown.addEventListener('click', ()=> setMainVol(mainGain.gain.value - 0.05));
   volUp.addEventListener('click', ()=> setMainVol(mainGain.gain.value + 0.05));
-  muteBtn.addEventListener('click', ()=> setMainVol(mainGain.gain.value > 0 ? 0 : (Number(volumeSlider.value) || 1)) );
+  muteBtn.addEventListener('click', ()=> setMainVol(mainGain.gain.value > 0 ? 0 : (state.tracks[state.currentIndex]?.volume || 1)) );
 
   setInBtn.addEventListener('click', ()=>{ const tr = state.tracks[state.currentIndex]; if(!tr) return; tr.cueIn=Math.floor(audio.currentTime); renderPlaylists(); saveSettings(); });
   setOutBtn.addEventListener('click', ()=>{ const tr = state.tracks[state.currentIndex]; if(!tr) return; tr.cueOut=Math.floor(audio.currentTime); renderPlaylists(); saveSettings(); });
@@ -815,10 +828,12 @@
   async function bgmPlay(){
     ensureCtx(); if(!ctx) return;
     await ctx.resume();
-    if (!bgmStartFromZero.checked) { rampGain(bgmGain, Number(bgmVolume.value), 0); }
-
     const tr = state.bgmTracks[state.currentBgmIndex];
-    if(tr && tr.cueIn != null && bgm.currentTime < tr.cueIn) { bgm.currentTime = tr.cueIn; }
+    if(!tr) return;
+    
+    rampGain(bgmGain, bgmStartFromZero.checked ? 0 : tr.volume, 0);
+
+    if(tr.cueIn != null && bgm.currentTime < tr.cueIn) { bgm.currentTime = tr.cueIn; }
 
     try {
       await bgm.play();
@@ -864,9 +879,10 @@
   bgmNextBtn.addEventListener('click', () => { if (state.currentBgmIndex < state.bgmTracks.length - 1) selectBgmIndex(state.currentBgmIndex + 1); });
   
   bgmFadeInBtn.addEventListener('click', ()=>{
+    const tr = state.bgmTracks[state.currentBgmIndex]; if(!tr) return;
     if(bgm.paused) bgmPlay();
     if(bgmStartFromZero.checked) rampGain(bgmGain, 0, 0);
-    rampGain(bgmGain, Number(bgmVolume.value), Number(bgmFadeInSec.value));
+    rampGain(bgmGain, tr.volume, Number(bgmFadeInSec.value));
   });
   bgmFadeOutBtn.addEventListener('click', ()=> bgmFadeTo(0, Number(bgmFadeOutSec.value)) );
   bgmFadeStopBtn.addEventListener('click', ()=> bgmFadeTo(0, Number(bgmFadeOutSec.value), {stopAfter:true}) );
@@ -877,18 +893,16 @@
     if(bgmGain) bgmGain.gain.value = val;
     bgmVolume.value = String(val);
     bgmVolNum.value = String(Math.round(val*100));
+
+    const currentTrack = state.bgmTracks[state.currentBgmIndex];
+    if(currentTrack) { currentTrack.volume = val; }
+
     if(save) saveSettings();
   }
   bgmVolume.addEventListener('input', ()=> setBgmVol(Number(bgmVolume.value)) );
   bgmVolNum.addEventListener('input', ()=> setBgmVol(Number(bgmVolNum.value)/100));
   bgmVolDown.addEventListener('click', ()=> setBgmVol(bgmGain.gain.value - 0.05) );
   bgmVolUp.addEventListener('click', ()=> setBgmVol(bgmGain.gain.value + 0.05) );
-
-  bgmProgress.addEventListener('click', (e)=>{
-    const r = bgmProgress.getBoundingClientRect();
-    const ratio = clamp01((e.clientX - r.left) / r.width);
-    if(isFinite(bgm.duration)) bgm.currentTime = ratio * bgm.duration;
-  });
 
   bgmSetInBtn.addEventListener('click', ()=>{ const tr = state.bgmTracks[state.currentBgmIndex]; if(!tr) return; tr.cueIn = Math.floor(bgm.currentTime); renderPlaylists(); saveSettings(); });
   bgmSetOutBtn.addEventListener('click', ()=>{ const tr = state.bgmTracks[state.currentBgmIndex]; if(!tr) return; tr.cueOut = Math.floor(bgm.currentTime); renderPlaylists(); saveSettings(); });
@@ -1019,8 +1033,6 @@
   }
 
   function applySettings(settings) {
-    setMainVol(settings.volumes?.main ?? 1, false);
-    setBgmVol(settings.volumes?.bgm ?? 0.5, false);
     if (settings.toggles) {
         autoAdvance.checked = !!settings.toggles.autoAdvance; playFromIn.checked = !!settings.toggles.playFromIn;
         autoStopAtOut.checked = !!settings.toggles.autoStopAtOut; bgmLoop.checked = !!settings.toggles.bgmLoop;
@@ -1061,6 +1073,7 @@
             if (savedData) {
                 t.cueIn = savedData.cueIn ?? null;
                 t.cueOut = savedData.cueOut ?? null;
+                t.volume = savedData.volume ?? 1.0;
             }
         });
     }
@@ -1075,7 +1088,7 @@
     const githubFiles = await loadPlaylistFromGitHub() || [];
     const baseTracks = githubFiles.map(item => ({
         id: crypto.randomUUID(), name: item.name, url: item.path, path: item.path,
-        kind: 'repo', cueIn: null, cueOut: null
+        kind: 'repo', cueIn: null, cueOut: null, volume: 1.0
     }));
 
     state.tracks = [...baseTracks];
