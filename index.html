@@ -1,8 +1,17 @@
+`user-scalable=no` などを追加することで、ユーザーがズーム操作をできないようにブラウザに指示します。
+
+---
+
+### 修正後の `index.html` コード
+
+以下が、ズーム機能を無効化した `index.html` の全コードです。この内容で全体を置き換えてください。
+
+```html
 <!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1, minimum-scale=1" />
 <title>学習発表会 音響コントローラ Pro+</title>
 <style>
   :root{
@@ -516,13 +525,12 @@
     const isActive = isBgm ? (index === state.currentBgmIndex) : (index === state.currentIndex);
     if(isActive) li.classList.add('active');
     
-    // Conditional buttons
     const upButton = index > 0 
         ? `<button class="btn btn-reorder" data-act="move-up" title="上へ">⬆️</button>` 
-        : `<div style="width: 33px; height: 16px;"></div>`; // Placeholder for alignment
+        : `<div style="width: 33px; height: 16px;"></div>`;
     const downButton = index < listLength - 1
         ? `<button class="btn btn-reorder" data-act="move-down" title="下へ">⬇️</button>`
-        : `<div style="width: 33px; height: 16px;"></div>`; // Placeholder for alignment
+        : `<div style="width: 33px; height: 16px;"></div>`;
     
     li.innerHTML = `
       <div class="reorder-buttons">
