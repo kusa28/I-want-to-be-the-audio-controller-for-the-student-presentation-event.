@@ -70,6 +70,12 @@
   .tabs{display:flex;gap:4px; border-bottom: 1px solid var(--border); margin-bottom: 8px;}
   .tabs button{background:transparent;border:0;color:var(--muted);padding:8px 12px;font-size:16px;font-weight:bold;cursor:pointer; border-bottom: 3px solid transparent;}
   .tabs button.active{color:var(--accent); border-bottom-color: var(--accent);}
+  /* Modal Styles */
+  .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+  .modal-content { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 16px; max-width: 500px; width: 90%; max-height: 80vh; display: flex; flex-direction: column; }
+  .modal-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex-grow: 1; }
+  .modal-list li { display: flex; align-items: center; gap: 10px; padding: 8px; border-bottom: 1px solid var(--border); }
+  .modal-footer { margin-top: 16px; display: flex; justify-content: flex-end; gap: 8px; }
 </style>
 </head>
 <body>
@@ -111,10 +117,10 @@
       <input id="search" type="text" placeholder="検索 (曲名)" style="flex:1"/>
     </div>
     <div class="row" style="margin-top:8px">
-      <input id="fileInput" type="file" accept="audio/*" multiple style="display:none"/>
-      <button id="addFiles" class="btn">📁 ファイル追加</button>
-      <button id="addUrl" class="btn">🌐 URL追加</button>
-      <button id="clearList" class="btn" title="全消去">🧹 クリア</button>
+      <button id="addFromRepoBtn" class="btn">📦 リポジトリから追加</button>
+      <button id="addFiles" class="btn">📁</button>
+      <button id="addUrl" class="btn">🌐</button>
+      <button id="clearList" class="btn" title="全消去">🧹</button>
     </div>
     <div id="dropzone" class="dropzone" style="margin-top:8px">ここに音声ファイルをドラッグ&ドロップ</div>
 
@@ -305,7 +311,49 @@
 <audio id="bgm" crossorigin="anonymous"></audio>
 
 <script>
-(() => {
+// ===============================================================
+// ▼▼▼ パスワード設定 ▼▼▼
+// ここに、SHA-256でハッシュ化したパスワードを貼り付けてください。
+// 例: '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8' (これは 'password' のハッシュです)
+const PASSWORD_HASH = 'ここにコピーしたハッシュ値を貼り付け';
+// ▲▲▲ パスワード設定 ▲▲▲
+// ===============================================================
+
+(async () => {
+  // --- Authentication ---
+  const AUTH_KEY = 'soundboard.auth.session';
+  async function hashString(str) {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(str);
+      const hash = await crypto.subtle.digest('SHA-256', data);
+      return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+  async function checkAuth() {
+    if (sessionStorage.getItem(AUTH_KEY) === 'ok') {
+        return true;
+    }
+    const enteredPassword = prompt('パスワードを入力してください:');
+    if (!enteredPassword) return false;
+
+    const enteredHash = await hashString(enteredPassword);
+    if (enteredHash === PASSWORD_HASH) {
+        sessionStorage.setItem(AUTH_KEY, 'ok');
+        return true;
+    }
+    return false;
+  }
+  
+  if (PASSWORD_HASH !== 'ここにコピーしたハッシュ値を貼り付け') {
+      let authorized = false;
+      while(!authorized) {
+          authorized = await checkAuth();
+          if (!authorized) {
+              alert('パスワードが違います。');
+          }
+      }
+  }
+
+  // --- App Initialization ---
   const $ = (sel) => document.querySelector(sel);
   const audio = $('#audio');
   const bgm   = $('#bgm');
@@ -344,6 +392,7 @@
 
   // ===== State =====
   const state = {
+    masterTrackList: [], // All tracks from GitHub are stored here permanently
     tracks: [],
     bgmTracks: [],
     filter: '',
@@ -416,6 +465,7 @@
   const addFilesBtn = $('#addFiles');
   const fileInput = $('#fileInput');
   const addUrlBtn = $('#addUrl');
+  const addFromRepoBtn = $('#addFromRepoBtn');
   const clearListBtn = $('#clearList');
   const search = $('#search');
   const dropzone = $('#dropzone');
@@ -477,7 +527,7 @@
     try {
       const trackData = {};
       const uniqueTracks = new Map();
-      [...state.tracks, ...state.bgmTracks].forEach(t => {
+      [...state.masterTrackList, ...state.tracks, ...state.bgmTracks].forEach(t => {
           if (t.path && !uniqueTracks.has(t.path)) {
               uniqueTracks.set(t.path, t);
           }
@@ -656,8 +706,15 @@
 
   function removeAt(i, isBgm){
     const targetArray = isBgm ? state.bgmTracks : state.tracks;
-    const [removed] = targetArray.splice(i,1);
-    try{ if(removed.kind === 'local' && removed.url.startsWith('blob:')) URL.revokeObjectURL(removed.url);}catch{}
+    const removedTrack = targetArray[i];
+    
+    // For repo tracks, just remove from visible list. For local/URL, really remove.
+    if (removedTrack.kind === 'repo') {
+        targetArray.splice(i,1);
+    } else {
+        const [removed] = targetArray.splice(i,1);
+        try{ if(removed.kind==='local' && removed.url.startsWith('blob:')) URL.revokeObjectURL(removed.url);}catch{}
+    }
     
     if (isBgm) {
       if(state.currentBgmIndex === i){
@@ -928,7 +985,7 @@
   bgm.addEventListener('pause', () => { bgmPlayPauseBtn.textContent = '▶️ BGM再生'; bgmPlayPauseBtn.classList.add('ok'); });
   bgmLoop.addEventListener('change', () => { bgm.loop = bgmLoop.checked; saveSettings(); });
 
-  // ===== Left Panel Logic (Tabs, D&D, etc) =====
+  // ===== Left Panel Logic =====
   tabPlaylist.addEventListener('click', () => {
     tabPlaylist.classList.add('active'); tabBgm.classList.remove('active');
     playlistContainer.classList.remove('hidden'); bgmPlaylistContainer.classList.add('hidden');
@@ -1019,9 +1076,7 @@
         cacheStatus.textContent = "このブラウザはキャッシュに非対応です。";
         return;
     }
-    const allRepoTracks = [...new Map([...state.tracks, ...state.bgmTracks].map(item => [item.path, item])).values()]
-                            .filter(t => t.kind === 'repo');
-    const urlsToCache = allRepoTracks.map(t => t.path);
+    const urlsToCache = state.masterTrackList.map(t => t.path);
     if (urlsToCache.length === 0) {
         cacheStatus.textContent = "キャッシュ対象の曲がありません。";
         return;
@@ -1037,7 +1092,11 @@
             count++;
             cacheStatus.textContent = `準備中... (${count}/${urlsToCache.length})`;
             try {
-                await cache.add(new Request(url, { cache: 'reload' })); // Force re-fetch
+                // If already cached, don't re-fetch
+                const existing = await cache.match(url);
+                if (!existing) {
+                    await cache.add(new Request(url, { cache: 'reload' }));
+                }
             } catch (e) {
                 console.warn(`キャッシュ失敗: ${url}`, e);
             }
@@ -1129,19 +1188,16 @@
     }
     if(settings.ui) {
         search.value = settings.ui.searchFilter || '';
-        if(settings.ui.activeTab === 'bgm') tabBgm.click(); else tabPlaylist.click();
+        if(settings.ui.activeTab === 'bgm') { tabBgm.click(); } else { tabPlaylist.click(); }
     }
     
-    const allAvailableTracks = new Map();
-    [...state.tracks, ...state.bgmTracks].forEach(t => {
-        if (!allAvailableTracks.has(t.path)) { allAvailableTracks.set(t.path, t); }
-    });
+    const trackMap = new Map(state.masterTrackList.map(t => [t.path, JSON.parse(JSON.stringify(t))]));
     
     if (settings.playlistOrder) {
-        state.tracks = settings.playlistOrder.map(path => allAvailableTracks.get(path)).filter(Boolean);
+        state.tracks = settings.playlistOrder.map(path => trackMap.get(path)).filter(Boolean);
     }
     if (settings.bgmPlaylistOrder) {
-        state.bgmTracks = settings.bgmPlaylistOrder.map(path => allAvailableTracks.get(path)).filter(Boolean);
+        state.bgmTracks = settings.bgmPlaylistOrder.map(path => trackMap.get(path)).filter(Boolean);
     }
     
     if (settings.trackData) {
@@ -1160,6 +1216,64 @@
 
     renderPlaylists();
   }
+  
+  // Repo Track Restore Modal
+  function showRepoModal() {
+    const isBgm = !bgmPlaylistContainer.classList.contains('hidden');
+    const currentList = isBgm ? state.bgmTracks : state.tracks;
+    const currentPaths = new Set(currentList.map(t => t.path));
+    const missingTracks = state.masterTrackList.filter(t => !currentPaths.has(t.path));
+
+    if (missingTracks.length === 0) {
+        alert("すべてのリポジトリ音源がリストにあります。");
+        return;
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    
+    const content = document.createElement('div');
+    content.className = 'modal-content';
+    content.innerHTML = `
+        <h3>リポジトリから${isBgm ? 'BGM' : '曲'}を追加</h3>
+        <ul class="modal-list">
+            ${missingTracks.map(t => `
+                <li>
+                    <input type="checkbox" id="track-${t.id}" value="${t.path}">
+                    <label for="track-${t.id}">${t.name}</label>
+                </li>
+            `).join('')}
+        </ul>
+        <div class="modal-footer">
+            <button id="modal-cancel" class="btn">キャンセル</button>
+            <button id="modal-add" class="btn primary">追加</button>
+        </div>
+    `;
+    overlay.appendChild(content);
+    document.body.appendChild(overlay);
+
+    overlay.addEventListener('click', (e) => { if(e.target === overlay) overlay.remove(); });
+    content.querySelector('#modal-cancel').addEventListener('click', () => overlay.remove());
+    content.querySelector('#modal-add').addEventListener('click', () => {
+        const selectedPaths = [...content.querySelectorAll('input:checked')].map(input => input.value);
+        const tracksToAdd = state.masterTrackList.filter(t => selectedPaths.includes(t.path));
+        
+        // Deep copy to avoid reference issues
+        const newTracks = JSON.parse(JSON.stringify(tracksToAdd));
+        
+        if (isBgm) {
+            state.bgmTracks.push(...newTracks);
+        } else {
+            state.tracks.push(...newTracks);
+        }
+        
+        renderPlaylists();
+        saveSettings();
+        overlay.remove();
+    });
+  }
+  addFromRepoBtn.addEventListener('click', showRepoModal);
+
 
   async function initialize(){
     if ('serviceWorker' in navigator) {
@@ -1173,15 +1287,15 @@
     }
     
     const githubFiles = await loadPlaylistFromGitHub() || [];
-    const baseTracks = githubFiles.map(item => ({
+    state.masterTrackList = githubFiles.map(item => ({
         id: crypto.randomUUID(), name: item.name, url: item.path, path: item.path,
         kind: 'repo', cueIn: null, cueOut: null, volume: 1.0
     }));
 
-    state.tracks = [...baseTracks];
-    const bgmBaseTracks = JSON.parse(JSON.stringify(baseTracks)); // Deep copy
-    bgmBaseTracks.forEach(t => t.volume = 0.5); // Default BGM volume
-    state.bgmTracks = bgmBaseTracks;
+    // Make default copies for initial state
+    state.tracks = JSON.parse(JSON.stringify(state.masterTrackList));
+    state.bgmTracks = JSON.parse(JSON.stringify(state.masterTrackList));
+    state.bgmTracks.forEach(t => t.volume = 0.5);
 
     const settings = loadSettings();
     if (settings) {
