@@ -315,1014 +315,930 @@
 // ▼▼▼ パスワード設定 ▼▼▼
 // ここに、SHA-256でハッシュ化したパスワードを貼り付けてください。
 // 例: '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8' (これは 'password' のハッシュです)
-const PASSWORD_HASH = 'ここにコピーしたハッシュ値を貼り付け';
+const PASSWORD_HASH = 'e70655085b1b98bc0aa344d7a79a2bc703af1247331a300e490ed3582d854da9';
 // ▲▲▲ パスワード設定 ▲▲▲
 // ===============================================================
 
-(async () => {
-  // --- Authentication ---
-  const AUTH_KEY = 'soundboard.auth.session';
-  async function hashString(str) {
-      if (!str) return '';
-      const encoder = new TextEncoder();
-      const data = encoder.encode(str);
-      const hash = await crypto.subtle.digest('SHA-256', data);
-      return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
-  }
-  async function checkAuth() {
-    if (sessionStorage.getItem(AUTH_KEY) === 'ok') {
-        return true;
-    }
-    const enteredPassword = prompt('パスワードを入力してください:');
-    if (enteredPassword === null) { // User clicked cancel
-        document.body.innerHTML = '<div style="padding: 20px; text-align:center;">キャンセルされました。</div>';
-        return false;
-    }
-
-    const enteredHash = await hashString(enteredPassword);
-    if (enteredHash === PASSWORD_HASH) {
-        sessionStorage.setItem(AUTH_KEY, 'ok');
-        return true;
-    }
-    return false;
-  }
-  
-  if (PASSWORD_HASH !== 'ここにコピーしたハッシュ値を貼り付け' && PASSWORD_HASH !== '') {
-      let authorized = false;
-      while(!authorized) {
-          authorized = await checkAuth();
-          if (!authorized && authorized !== null) { // Check for null to avoid alert on cancel
-              alert('パスワードが違います。');
-          } else if (authorized === null) {
-              return; // Stop execution if user cancelled
-          }
-      }
-  }
-
-  // --- App Initialization ---
-  const $ = (sel) => document.querySelector(sel);
-  const audio = $('#audio');
-  const bgm   = $('#bgm');
-
-  // ===== WebAudio Graph =====
-  let ctx, mainSrc, bgmSrc, mainGain, bgmGain, analyser, dataArray;
-  function ensureCtx(){
-    if(ctx) return;
-    try {
-      ctx = new (window.AudioContext || window.webkitAudioContext)();
-      mainSrc = ctx.createMediaElementSource(audio);
-      bgmSrc  = ctx.createMediaElementSource(bgm);
-      mainGain = ctx.createGain(); mainGain.gain.value = 1;
-      bgmGain  = ctx.createGain(); bgmGain.gain.value  = 0.5;
-      analyser = ctx.createAnalyser(); analyser.fftSize = 2048;
-      dataArray = new Uint8Array(analyser.frequencyBinCount);
-      mainSrc.connect(mainGain).connect(analyser).connect(ctx.destination);
-      bgmSrc.connect(bgmGain).connect(ctx.destination);
-    } catch(e) {
-      console.error("AudioContextの初期化に失敗しました。", e);
-      alert("オーディオ機能の初期化に失敗しました。ブラウザが対応していない可能性があります。");
-    }
-  }
-  function now(){ ensureCtx(); return ctx.currentTime; }
-  function clamp01(x){ return Math.max(0, Math.min(1, x)); }
-  function rampGain(node, target, sec){
-    ensureCtx();
-    if(!ctx || !node) return;
-    const t = Math.max(0, Number(sec)||0);
-    const n = now();
-    const cur = node.gain.value;
-    node.gain.cancelScheduledValues(n);
-    node.gain.setValueAtTime(cur, n);
-    node.gain.linearRampToValueAtTime(clamp01(target), n + t);
-  }
-
-  // ===== State =====
-  const state = {
-    masterTrackList: [], 
-    tracks: [],
-    bgmTracks: [],
-    filter: '',
-    currentIndex: -1,
-    currentBgmIndex: -1,
-    wakeLock: null,
-    duck: { enable:true, prevVol:0.5 },
-  };
-
-  // ===== Common helpers =====
-  function formatTime(sec){
-    if(!isFinite(sec)) return '00:00';
-    sec = Math.max(0, Math.floor(sec));
-    const m = Math.floor(sec / 60).toString().padStart(2,'0');
-    const s = (sec % 60).toString().padStart(2,'0');
-    return `${m}:${s}`;
-  }
-
-  // ====== UI Refs (Main) ======
-  const playlistEl = $('#playlist');
-  const countBadge = $('#countBadge');
-  const titleEl = $('#title');
-  const elapsedEl = $('#elapsed');
-  const durationEl = $('#duration');
-  const remainingEl = $('#remaining');
-  const progress = $('#progress');
-  const progressBar = $('#progressBar');
-
-  const playPauseBtn = $('#playPause');
-  const stopBtn = $('#stop');
-  const muteBtn = $('#mute');
-  const seekBackBtn = $('#seekBack');
-  const seekFwdBtn = $('#seekFwd');
-  const prevBtn = $('#prevBtn');
-  const nextBtn = $('#nextBtn');
-
-  const fadeInBtn = $('#fadeInBtn');
-  const fadeOutBtn = $('#fadeOutBtn');
-  const fadeStopBtn = $('#fadeStopBtn');
-  const fadeInSec = $('#fadeInSec');
-  const fadeOutSec = $('#fadeOutSec');
-  const startFromZero = $('#startFromZero');
-
-  const volumeSlider = $('#volume');
-  const volNum = $('#volNum');
-  const volDown = $('#volDown');
-  const volUp = $('#volUp');
-
-  const levelMeter = $('#level');
-  const levelDb = $('#levelDb');
-
-  const setInBtn = $('#setIn');
-  const setOutBtn = $('#setOut');
-  const goInBtn = $('#goIn');
-  const clearCueBtn = $('#clearCue');
-  const inTimeEl = $('#inTime');
-  const outTimeEl = $('#outTime');
-  const autoAdvance = $('#autoAdvance');
-  const playFromIn = $('#playFromIn');
-  const autoStopAtOut = $('#autoStopAtOut');
-  
-  const panicBtn = $('#panicBtn');
-  const wakeLockToggle = $('#wakeLockToggle');
-
-  // ====== UI Refs (Left Panel) ======
-  const tabPlaylist = $('#tabPlaylist');
-  const tabBgm = $('#tabBgm');
-  const playlistContainer = $('#playlistContainer');
-  const bgmPlaylistContainer = $('#bgmPlaylistContainer');
-  const addFilesBtn = $('#addFiles');
-  const fileInput = $('#fileInput');
-  const addUrlBtn = $('#addUrl');
-  const addFromRepoBtn = $('#addFromRepoBtn');
-  const clearListBtn = $('#clearList');
-  const search = $('#search');
-  const dropzone = $('#dropzone');
-  const exportSettingsBtn = $('#exportSettingsBtn');
-  const importSettingsBtn = $('#importSettingsBtn');
-  const importFile = $('#importFile');
-  const cacheBtn = $('#cacheBtn');
-  const clearCacheBtn = $('#clearCacheBtn');
-  const cacheStatus = $('#cacheStatus');
-
-
-  // ====== UI Refs (BGM) ======
-  const bgmPlaylistEl = $('#bgmPlaylist');
-  const bgmCountBadge = $('#bgmCountBadge');
-  const bgmPlayPauseBtn = $('#bgmPlayPause');
-  const bgmStopBtn = $('#bgmStop');
-  const bgmPrevBtn = $('#bgmPrevBtn');
-  const bgmNextBtn = $('#bgmNextBtn');
-  const bgmSeekBack = $('#bgmSeekBack');
-  const bgmSeekFwd = $('#bgmSeekFwd');
-
-  const bgmFadeInBtn = $('#bgmFadeIn');
-  const bgmFadeOutBtn = $('#bgmFadeOut');
-  const bgmFadeStopBtn = $('#bgmFadeStop');
-  const bgmFadeInSec = $('#bgmFadeInSec');
-  const bgmFadeOutSec = $('#bgmFadeOutSec');
-  const bgmStartFromZero = $('#bgmStartFromZero');
-
-  const bgmVolume = $('#bgmVolume');
-  const bgmVolNum = $('#bgmVolNum');
-  const bgmVolDown = $('#bgmVolDown');
-  const bgmVolUp = $('#bgmVolUp');
-  const bgmLoop = $('#bgmLoop');
-  const bgmTitle = $('#bgmTitle');
-
-  const bgmProgress = $('#bgmProgress');
-  const bgmProgressBar = $('#bgmProgressBar');
-  const bgmElapsedEl = $('#bgmElapsed');
-  const bgmDurationEl = $('#bgmDuration');
-  const bgmRemainingEl = $('#bgmRemaining');
-
-  const bgmSetInBtn = $('#bgmSetIn');
-  const bgmSetOutBtn = $('#bgmSetOut');
-  const bgmGoInBtn = $('#bgmGoIn');
-  const bgmClearCueBtn = $('#bgmClearCue');
-  const bgmInTimeEl = $('#bgmInTime');
-  const bgmOutTimeEl = $('#bgmOutTime');
-  const bgmAutoStopAtOut = $('#bgmAutoStopAtOut');
-
-  // デュッキング設定
-  const duckEnable = $('#duckEnable');
-  const duckTarget = $('#duckTarget');
-  const duckSec = $('#duckSec');
-  const unduckSec = $('#unduckSec');
-
-  // ===== Settings (localStorage) =====
-  const SETTINGS_KEY = 'soundboard.settings.v5';
-  function saveSettings(){
-    try {
-      const trackData = {};
-      const uniqueTracks = new Map();
-      [...state.masterTrackList, ...state.tracks, ...state.bgmTracks].forEach(t => {
-          if (t.path && !uniqueTracks.has(t.path)) {
-              uniqueTracks.set(t.path, t);
-          }
-      });
-      uniqueTracks.forEach(t => {
-        trackData[t.path] = { cueIn: t.cueIn, cueOut: t.cueOut, volume: t.volume };
-      });
+(function() {
+  // --- Authentication & Main Execution Logic ---
+  async function runAuthentication() {
+      const AUTH_KEY = 'soundboard.auth.session';
       
-      const settings = {
-        version: 5,
-        playlistOrder: state.tracks.map(t => t.path).filter(Boolean),
-        bgmPlaylistOrder: state.bgmTracks.map(t => t.path).filter(Boolean),
-        trackData,
-        currentIndex: state.currentIndex,
-        currentBgmIndex: state.currentBgmIndex,
-        toggles: {
-          wakeLock: wakeLockToggle.checked,
-          autoAdvance: autoAdvance.checked, playFromIn: playFromIn.checked, autoStopAtOut: autoStopAtOut.checked,
-          bgmLoop: bgmLoop.checked, bgmAutoStopAtOut: bgmAutoStopAtOut.checked, duckEnable: duckEnable.checked,
-          mainStartFromZero: startFromZero.checked, bgmStartFromZero: bgmStartFromZero.checked
-        },
-        fadeSec: { mainIn: fadeInSec.value, mainOut: fadeOutSec.value, bgmIn: bgmFadeInSec.value, bgmOut: bgmFadeOutSec.value },
-        duckParams: { target: duckTarget.value, duck: duckSec.value, unduck: unduckSec.value },
-        ui: {
-            searchFilter: search.value,
-            activeTab: bgmPlaylistContainer.classList.contains('hidden') ? 'playlist' : 'bgm'
-        }
-      };
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-    } catch(e) { console.warn('設定の保存に失敗しました', e); }
-  }
-  function loadSettings(){
-    try {
-      const raw = localStorage.getItem(SETTINGS_KEY);
-      if(!raw) return null;
-      const data = JSON.parse(raw);
-      if (data.version !== 5) {
-          console.warn("古いバージョンの設定です。一部が正しく復元されない可能性があります。");
-          localStorage.removeItem(SETTINGS_KEY);
-          return null;
+      async function hashString(str) {
+          if (!str) return '';
+          const encoder = new TextEncoder();
+          const data = encoder.encode(str);
+          const hash = await crypto.subtle.digest('SHA-256', data);
+          return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
       }
-      return data;
-    } catch(e) { console.warn('設定の読み込みに失敗しました', e); return null; }
-  }
 
-  // ===== Playlist & UI Rendering =====
-  function createPlaylistItem(track, index, isBgm = false, listLength) {
-    const q = (search.value||'').trim().toLowerCase();
-    if(q && !track.name.toLowerCase().includes(q)) return null;
-    
-    const li = document.createElement('li');
-    const isActive = isBgm ? (index === state.currentBgmIndex) : (index === state.currentIndex);
-    if(isActive) li.classList.add('active');
-    
-    const upButton = index > 0 
-        ? `<button class="btn btn-reorder" data-act="move-up" title="上へ">⬆️</button>` 
-        : `<div style="width: 33px; height: 16px;"></div>`;
-    const downButton = index < listLength - 1
-        ? `<button class="btn btn-reorder" data-act="move-down" title="下へ">⬇️</button>`
-        : `<div style="width: 33px; height: 16px;"></div>`;
-    
-    li.innerHTML = `
-      <div class="reorder-buttons">
-        ${upButton}
-        ${downButton}
-      </div>
-      <span class="name" title="タップで選択">${track.name}</span>
-      ${track.cueIn!=null ? `<span class="badge">IN ${formatTime(track.cueIn)}</span>`: ''}
-      ${track.cueOut!=null ? `<span class="badge">OUT ${formatTime(track.cueOut)}</span>`: ''}
-      <button class="btn" data-act="play">▶</button>
-      <button class="btn" data-act="remove" title="削除">✖</button>
-    `;
-    
-    li.querySelector('.name').addEventListener('click', () => isBgm ? selectBgmIndex(index) : selectIndex(index));
-    li.querySelector('[data-act="play"]').addEventListener('click', (e) => {
-      e.stopPropagation();
-      if(isBgm) {
-        selectBgmIndex(index);
-        bgm.paused ? bgmPlay() : bgmPause();
-      } else {
-        selectIndex(index);
-        audio.paused ? play() : pause();
+      if (PASSWORD_HASH === 'ここにコピーしたハッシュ値を貼り付け' || PASSWORD_HASH === '') {
+          return true; // Password not set, allow access.
       }
-    });
-    li.querySelector('[data-act="remove"]').addEventListener('click', (e) => { e.stopPropagation(); removeAt(index, isBgm); });
-    
-    const upBtn = li.querySelector('[data-act="move-up"]');
-    if (upBtn) upBtn.addEventListener('click', (e) => { e.stopPropagation(); moveItem(index, index - 1, isBgm); });
-    
-    const downBtn = li.querySelector('[data-act="move-down"]');
-    if (downBtn) downBtn.addEventListener('click', (e) => { e.stopPropagation(); moveItem(index, index + 1, isBgm); });
-
-    return li;
-  }
-
-  function renderPlaylists() {
-    playlistEl.innerHTML = '';
-    state.tracks.forEach((t, i, arr) => {
-      const li = createPlaylistItem(t, i, false, arr.length);
-      if(li) playlistEl.appendChild(li);
-    });
-    countBadge.textContent = `${state.tracks.length} 曲`;
-
-    bgmPlaylistEl.innerHTML = '';
-    state.bgmTracks.forEach((t, i, arr) => {
-      const li = createPlaylistItem(t, i, true, arr.length);
-      if(li) bgmPlaylistEl.appendChild(li);
-    });
-    bgmCountBadge.textContent = `${state.bgmTracks.length} 曲`;
-  }
-  
-  function moveItem(from, to, isBgm){
-    if(from === to || to < 0 || to >= (isBgm ? state.bgmTracks.length : state.tracks.length)) return;
-    const targetArray = isBgm ? state.bgmTracks : state.tracks;
-    const item = targetArray.splice(from, 1)[0];
-    targetArray.splice(to, 0, item);
-
-    if (isBgm) {
-      if(state.currentBgmIndex === from) state.currentBgmIndex = to;
-      else if(from < state.currentBgmIndex && to >= state.currentBgmIndex) state.currentBgmIndex--; 
-      else if(from > state.currentBgmIndex && to <= state.currentBgmIndex) state.currentBgmIndex++;
-    } else {
-      if(state.currentIndex === from) state.currentIndex = to;
-      else if(from < state.currentIndex && to >= state.currentIndex) state.currentIndex--; 
-      else if(from > state.currentIndex && to <= state.currentIndex) state.currentIndex++;
-    }
-    renderPlaylists();
-    saveSettings();
-  }
-  
-  function selectIndex(idx, forceReload = false){
-    if (idx < 0 || idx >= state.tracks.length) return;
-    const old = state.currentIndex;
-    state.currentIndex = idx;
-    
-    const tr = state.tracks[idx];
-    if(!tr) { titleEl.textContent = '—'; audio.src = ''; return; }
-    
-    setMainVol(tr.volume ?? 1.0, false);
-    
-    titleEl.textContent = tr.name;
-    inTimeEl.textContent = tr.cueIn != null ? formatTime(tr.cueIn) : '—';
-    outTimeEl.textContent = tr.cueOut != null ? formatTime(tr.cueOut) : '—';
-    
-    if (audio.src !== tr.url || forceReload) {
-        audio.src = tr.url;
-        audio.load();
-        if(old !== idx) pause();
-    }
-    renderPlaylists();
-    saveSettings();
-  }
-
-  function selectBgmIndex(idx, forceReload = false) {
-    if (idx < 0 || idx >= state.bgmTracks.length) return;
-    const old = state.currentBgmIndex;
-    state.currentBgmIndex = idx;
-    
-    const tr = state.bgmTracks[idx];
-    if(!tr) { bgmTitle.textContent = '—'; bgm.src = ''; return; }
-
-    setBgmVol(tr.volume ?? 0.5, false);
-
-    bgmTitle.textContent = tr.name;
-    bgmInTimeEl.textContent = tr.cueIn != null ? formatTime(tr.cueIn) : '—';
-    bgmOutTimeEl.textContent = tr.cueOut != null ? formatTime(tr.cueOut) : '—';
-
-    if (bgm.src !== tr.url || forceReload) {
-        bgm.src = tr.url;
-        bgm.load();
-        if(old !== idx) bgmPause();
-    }
-    renderPlaylists();
-    saveSettings();
-  }
-
-  function removeAt(i, isBgm){
-    const targetArray = isBgm ? state.bgmTracks : state.tracks;
-    const removedTrack = targetArray[i];
-    
-    if (removedTrack.kind === 'repo') {
-        targetArray.splice(i,1);
-    } else {
-        const [removed] = targetArray.splice(i,1);
-        try{ if(removed.kind==='local' && removed.url.startsWith('blob:')) URL.revokeObjectURL(removed.url);}catch{}
-    }
-    
-    if (isBgm) {
-      if(state.currentBgmIndex === i){
-        bgmPause(); bgm.src = '';
-        const newIndex = Math.min(i, targetArray.length - 1);
-        state.currentBgmIndex = -1;
-        selectBgmIndex(newIndex);
-      } else if(i < state.currentBgmIndex) {
-        state.currentBgmIndex--;
+      if (sessionStorage.getItem(AUTH_KEY) === 'ok') {
+          return true; // Already authenticated in this session.
       }
-    } else {
-      if(state.currentIndex === i){
-        pause(); audio.src='';
-        const newIndex = Math.min(i, targetArray.length - 1);
-        state.currentIndex = -1;
-        selectIndex(newIndex);
-      } else if(i < state.currentIndex) {
-        state.currentIndex--;
+
+      while (true) {
+          const enteredPassword = prompt('パスワードを入力してください:');
+          if (enteredPassword === null) {
+              document.body.innerHTML = '<div style="padding: 20px; text-align:center; color: var(--fg);">認証がキャンセルされました。</div>';
+              return false;
+          }
+          const enteredHash = await hashString(enteredPassword);
+          if (enteredHash === PASSWORD_HASH) {
+              sessionStorage.setItem(AUTH_KEY, 'ok');
+              return true;
+          }
+          alert('パスワードが違います。');
       }
-    }
-    renderPlaylists();
-    saveSettings();
   }
 
-  // ===== File/URL/Drop Handling =====
-  function addFiles(files, kind='local'){
-    const isBgmActive = !bgmPlaylistContainer.classList.contains('hidden');
-    const targetArray = isBgmActive ? state.bgmTracks : state.tracks;
+  // This function will contain the entire application logic
+  function main() {
+    const $ = (sel) => document.querySelector(sel);
+    const audio = $('#audio');
+    const bgm   = $('#bgm');
 
-    Array.from(files || []).forEach(f => {
-      const url = URL.createObjectURL(f);
-      targetArray.push({id:crypto.randomUUID(), name:f.name, url, kind, path:null, cueIn:null, cueOut:null, volume: isBgmActive ? 0.5 : 1.0});
-    });
+    // ... (All your existing application code from `main()` goes here) ...
+    // The following is the full content of your main() function from the previous version.
     
-    if (isBgmActive) {
-        if(state.currentBgmIndex < 0 && targetArray.length) selectBgmIndex(0); else renderPlaylists();
-    } else {
-        if(state.currentIndex < 0 && targetArray.length) selectIndex(0); else renderPlaylists();
-    }
-  }
-  function addUrlPrompt(){
-    const url = prompt('音源URLを貼り付け (mp3, wav 等)');
-    if(!url) return;
-    const name = prompt('曲名 (省略可)') || url.split('/').pop();
-    const isBgmActive = !bgmPlaylistContainer.classList.contains('hidden');
-    const targetArray = isBgmActive ? state.bgmTracks : state.tracks;
-    targetArray.push({id:crypto.randomUUID(), name, url, kind:'url', path:url, cueIn:null, cueOut:null, volume: isBgmActive ? 0.5 : 1.0});
-
-    if (isBgmActive) {
-        if(state.currentBgmIndex < 0) selectBgmIndex(0); else renderPlaylists();
-    } else {
-        if(state.currentIndex < 0) selectIndex(0); else renderPlaylists();
-    }
-    saveSettings();
-  }
-  
-  // ===== Main Transport =====
-  async function play(){
-    ensureCtx(); if(!ctx) return;
-    await ctx.resume();
-    const tr = state.tracks[state.currentIndex];
-    if(!tr) return;
-
-    rampGain(mainGain, startFromZero.checked ? 0 : (tr.volume ?? 1.0), 0);
-
-    if(tr.cueIn != null && playFromIn.checked && audio.currentTime < tr.cueIn){ audio.currentTime = tr.cueIn; }
-    
-    if(duckEnable.checked){
-      state.duck.prevVol = bgmGain.gain.value;
-      rampGain(bgmGain, Number(duckTarget.value)/100, Number(duckSec.value));
-    }
-    try{
-      await audio.play();
-      playPauseBtn.textContent = '⏸️ 一時停止'; playPauseBtn.classList.remove('primary');
-    }catch(err){ console.error('再生エラー', err); alert('再生できませんでした: ' + err.message); }
-  }
-  function pause(){
-    audio.pause();
-    playPauseBtn.textContent = '▶️ 再生'; playPauseBtn.classList.add('primary');
-    if(duckEnable.checked){ rampGain(bgmGain, state.duck.prevVol, Number(unduckSec.value)); }
-  }
-  function stop(){
-    audio.pause(); audio.currentTime = 0;
-    playPauseBtn.textContent='▶️ 再生'; playPauseBtn.classList.add('primary');
-    if(duckEnable.checked){ rampGain(bgmGain, state.duck.prevVol, Number(unduckSec.value)); }
-  }
-  function fadeMainTo(target, sec, {stopAfter=false}={}){
-    rampGain(mainGain, target, Number(sec)||0);
-    if(stopAfter && target <= 0.001){
-      setTimeout(()=>{ stop(); }, (Number(sec)||0)*1000 + 50);
-    }
-  }
-
-  // ===== Main Meters & Time Update =====
-  function updMainTime(){
-    const d = audio.duration||0, c = audio.currentTime||0;
-    elapsedEl.textContent = formatTime(c);
-    durationEl.textContent = formatTime(d);
-    remainingEl.textContent = formatTime(Math.max(0, d-c));
-    progressBar.style.width = `${d ? (c/d*100) : 0}%`;
-  }
-  function updLevel(){
-    if(!analyser) return;
-    analyser.getByteTimeDomainData(dataArray);
-    let sum = 0; for(let i=0;i<dataArray.length;i++){ const v=(dataArray[i]-128)/128; sum+=v*v; }
-    const rms=Math.sqrt(sum/dataArray.length)||1e-7, db=20*Math.log10(rms);
-    levelMeter.value = Math.max(-60, Math.min(0, db));
-    levelDb.textContent = (db<=-59?'-∞':db.toFixed(1)) + ' dB';
-  }
-  function checkCueOutAutoStop(){
-    const tr = state.tracks[state.currentIndex];
-    if(!tr) return;
-    if(autoStopAtOut.checked && tr.cueOut!=null){
-      const remain = tr.cueOut - audio.currentTime;
-      if(remain <= 0.05){ stop(); }
-      else if(remain > 0 && remain < 0.3){
-        const sec = Math.max(0.15, Number(fadeOutSec.value));
-        fadeMainTo(0, Math.min(sec, remain+0.05), {stopAfter:true});
-      }
-    }
-  }
-
-  // ===== Main Player Events =====
-  playPauseBtn.addEventListener('click', ()=> audio.paused ? play() : pause() );
-  stopBtn.addEventListener('click', stop);
-  seekBackBtn.addEventListener('click', ()=>{ audio.currentTime = Math.max(0, audio.currentTime - 5); });
-  seekFwdBtn.addEventListener('click', ()=>{ const d=audio.duration||0; audio.currentTime = Math.min(d, audio.currentTime + 5); });
-  prevBtn.addEventListener('click', () => { if (state.currentIndex > 0) selectIndex(state.currentIndex - 1); });
-  nextBtn.addEventListener('click', () => { if (state.currentIndex < state.tracks.length - 1) selectIndex(state.currentIndex + 1); });
-  
-  fadeInBtn.addEventListener('click', ()=>{
-    const tr = state.tracks[state.currentIndex]; if(!tr) return;
-    if(audio.paused) play();
-    if(startFromZero.checked) rampGain(mainGain, 0, 0);
-    rampGain(mainGain, tr.volume ?? 1.0, Number(fadeInSec.value));
-  });
-  fadeOutBtn.addEventListener('click', ()=> fadeMainTo(0, Number(fadeOutSec.value)) );
-  fadeStopBtn.addEventListener('click', ()=> fadeMainTo(0, Number(fadeOutSec.value), {stopAfter:true}) );
-
-  progress.addEventListener('click', (e)=>{
-    const r = progress.getBoundingClientRect();
-    const ratio = clamp01((e.clientX - r.left) / r.width);
-    if(isFinite(audio.duration)) audio.currentTime = ratio * audio.duration;
-  });
-
-  function setMainVol(v, save=true){
-    ensureCtx();
-    const val = clamp01(v);
-    if(mainGain) mainGain.gain.value = val;
-    volumeSlider.value = String(val);
-    volNum.value = String(Math.round(val*100));
-    
-    const currentTrack = state.tracks[state.currentIndex];
-    if(currentTrack) { currentTrack.volume = val; }
-
-    if(save) saveSettings();
-  }
-  volumeSlider.addEventListener('input', ()=> setMainVol(Number(volumeSlider.value)) );
-  volNum.addEventListener('input', ()=> setMainVol(Number(volNum.value)/100));
-  volDown.addEventListener('click', ()=> setMainVol(mainGain.gain.value - 0.05));
-  volUp.addEventListener('click', ()=> setMainVol(mainGain.gain.value + 0.05));
-  muteBtn.addEventListener('click', ()=> setMainVol(mainGain.gain.value > 0 ? 0 : (state.tracks[state.currentIndex]?.volume || 1)) );
-
-  setInBtn.addEventListener('click', ()=>{ const tr = state.tracks[state.currentIndex]; if(!tr) return; tr.cueIn=Math.floor(audio.currentTime); renderPlaylists(); saveSettings(); });
-  setOutBtn.addEventListener('click', ()=>{ const tr = state.tracks[state.currentIndex]; if(!tr) return; tr.cueOut=Math.floor(audio.currentTime); renderPlaylists(); saveSettings(); });
-  goInBtn.addEventListener('click', ()=>{ const tr = state.tracks[state.currentIndex]; if(tr && tr.cueIn!=null){ audio.currentTime = tr.cueIn; }});
-  clearCueBtn.addEventListener('click', ()=>{ const tr = state.tracks[state.currentIndex]; if(!tr) return; tr.cueIn=null; tr.cueOut=null; renderPlaylists(); saveSettings(); });
-
-  audio.addEventListener('play', ()=>{ if(!rafId) rafId = requestAnimationFrame(loop); });
-  audio.addEventListener('pause', ()=>{ if(rafId) { cancelAnimationFrame(rafId); rafId=null; } });
-  audio.addEventListener('loadedmetadata', updMainTime);
-  audio.addEventListener('timeupdate', updMainTime);
-  audio.addEventListener('ended', ()=>{
-    if(autoAdvance.checked){
-      const next = state.currentIndex + 1;
-      if(state.tracks[next]){ selectIndex(next); play(); }
-      else { stop(); }
-    }else{ stop(); }
-  });
-
-  // ===== BGM Transport & Events =====
-  async function bgmPlay(){
-    ensureCtx(); if(!ctx) return;
-    await ctx.resume();
-    const tr = state.bgmTracks[state.currentBgmIndex];
-    if(!tr) return;
-    
-    rampGain(bgmGain, bgmStartFromZero.checked ? 0 : (tr.volume ?? 0.5), 0);
-
-    if(tr.cueIn != null && bgm.currentTime < tr.cueIn) { bgm.currentTime = tr.cueIn; }
-
-    try {
-      await bgm.play();
-    } catch(e) { alert('BGM再生失敗: '+e.message); }
-  }
-  function bgmPause(){
-    bgm.pause();
-  }
-  function bgmStop(){
-    bgmPause();
-    bgm.currentTime = 0;
-  }
-  function bgmFadeTo(target, sec, {stopAfter=false}={}){
-    rampGain(bgmGain, target, Number(sec));
-    if(stopAfter && target <= 0.001){
-      setTimeout(()=>{ bgmStop(); }, (Number(sec))*1000 + 50);
-    }
-  }
-
-  function updBgmTime(){
-    const d = bgm.duration||0, c = bgm.currentTime||0;
-    bgmElapsedEl.textContent = formatTime(c);
-    bgmDurationEl.textContent = formatTime(d);
-    bgmRemainingEl.textContent = formatTime(Math.max(0, d-c));
-    bgmProgressBar.style.width = `${d ? (c/d*100) : 0}%`;
-  }
-  function checkBgmCueAutoStop(){
-    const tr = state.bgmTracks[state.currentBgmIndex];
-    if(!tr) return;
-    if(bgmAutoStopAtOut.checked && tr.cueOut != null){
-      const remain = tr.cueOut - bgm.currentTime;
-      if(remain <= 0.05){ bgmStop(); }
-      else if(remain > 0 && remain < 0.3){
-        const sec = Math.max(0.15, Number(bgmFadeOutSec.value));
-        bgmFadeTo(0, Math.min(sec, remain + 0.05), {stopAfter:true});
-      }
-    }
-  }
-  
-  bgmPlayPauseBtn.addEventListener('click', ()=> bgm.paused ? bgmPlay() : bgmPause());
-  bgmStopBtn.addEventListener('click', bgmStop);
-  bgmPrevBtn.addEventListener('click', () => { if (state.currentBgmIndex > 0) selectBgmIndex(state.currentBgmIndex - 1); });
-  bgmNextBtn.addEventListener('click', () => { if (state.currentBgmIndex < state.bgmTracks.length - 1) selectBgmIndex(state.currentBgmIndex + 1); });
-  
-  bgmFadeInBtn.addEventListener('click', ()=>{
-    const tr = state.bgmTracks[state.currentBgmIndex]; if(!tr) return;
-    if(bgm.paused) bgmPlay();
-    if(bgmStartFromZero.checked) rampGain(bgmGain, 0, 0);
-    rampGain(bgmGain, tr.volume ?? 0.5, Number(bgmFadeInSec.value));
-  });
-  bgmFadeOutBtn.addEventListener('click', ()=> bgmFadeTo(0, Number(bgmFadeOutSec.value)) );
-  bgmFadeStopBtn.addEventListener('click', ()=> bgmFadeTo(0, Number(bgmFadeOutSec.value), {stopAfter:true}) );
-
-  function setBgmVol(v, save=true){
-    ensureCtx();
-    const val = clamp01(v);
-    if(bgmGain) bgmGain.gain.value = val;
-    bgmVolume.value = String(val);
-    bgmVolNum.value = String(Math.round(val*100));
-
-    const currentTrack = state.bgmTracks[state.currentBgmIndex];
-    if(currentTrack) { currentTrack.volume = val; }
-
-    if(save) saveSettings();
-  }
-  bgmVolume.addEventListener('input', ()=> setBgmVol(Number(bgmVolume.value)) );
-  bgmVolNum.addEventListener('input', ()=> setBgmVol(Number(bgmVolNum.value)/100));
-  bgmVolDown.addEventListener('click', ()=> setBgmVol(bgmGain.gain.value - 0.05) );
-  bgmVolUp.addEventListener('click', ()=> setBgmVol(bgmGain.gain.value + 0.05) );
-
-  bgmProgress.addEventListener('click', (e)=>{ // BUGFIX: This was missing
-    const r = bgmProgress.getBoundingClientRect();
-    const ratio = clamp01((e.clientX - r.left) / r.width);
-    if(isFinite(bgm.duration)) bgm.currentTime = ratio * bgm.duration;
-  });
-
-  bgmSetInBtn.addEventListener('click', ()=>{ const tr = state.bgmTracks[state.currentBgmIndex]; if(!tr) return; tr.cueIn = Math.floor(bgm.currentTime); renderPlaylists(); saveSettings(); });
-  bgmSetOutBtn.addEventListener('click', ()=>{ const tr = state.bgmTracks[state.currentBgmIndex]; if(!tr) return; tr.cueOut = Math.floor(bgm.currentTime); renderPlaylists(); saveSettings(); });
-  bgmGoInBtn.addEventListener('click', ()=>{ const tr = state.bgmTracks[state.currentBgmIndex]; if(tr && tr.cueIn!=null){ bgm.currentTime = tr.cueIn; }});
-  bgmClearCueBtn.addEventListener('click', ()=>{ const tr = state.bgmTracks[state.currentBgmIndex]; if(!tr) return; tr.cueIn=null; tr.cueOut=null; renderPlaylists(); saveSettings(); });
-  bgm.addEventListener('loadedmetadata', updBgmTime);
-  bgm.addEventListener('timeupdate', updBgmTime);
-  bgm.addEventListener('play', () => { bgmPlayPauseBtn.textContent = '⏸️ BGM停止'; bgmPlayPauseBtn.classList.remove('ok'); });
-  bgm.addEventListener('pause', () => { bgmPlayPauseBtn.textContent = '▶️ BGM再生'; bgmPlayPauseBtn.classList.add('ok'); });
-  bgmLoop.addEventListener('change', () => { bgm.loop = bgmLoop.checked; saveSettings(); });
-
-  // ===== Left Panel Logic =====
-  tabPlaylist.addEventListener('click', () => {
-    tabPlaylist.classList.add('active'); tabBgm.classList.remove('active');
-    playlistContainer.classList.remove('hidden'); bgmPlaylistContainer.classList.add('hidden');
-    saveSettings();
-  });
-  tabBgm.addEventListener('click', () => {
-    tabBgm.classList.add('active'); tabPlaylist.classList.remove('active');
-    bgmPlaylistContainer.classList.remove('hidden'); playlistContainer.classList.add('hidden');
-    saveSettings();
-  });
-  addFilesBtn.addEventListener('click', ()=> fileInput.click());
-  fileInput.addEventListener('change', (e)=> addFiles(e.target.files));
-  addUrlBtn.addEventListener('click', addUrlPrompt);
-  clearListBtn.addEventListener('click', ()=>{
-    const isBgmActive = !bgmPlaylistContainer.classList.contains('hidden');
-    const targetArray = isBgmActive ? state.bgmTracks : state.tracks;
-    const repoTracks = targetArray.filter(t => t.kind === 'repo');
-    targetArray.forEach(t=>{ if(t.kind==='local' && t.url.startsWith('blob:')) try{URL.revokeObjectURL(t.url);}catch{} });
-    
-    if (isBgmActive) {
-      state.bgmTracks = repoTracks;
-      selectBgmIndex(0);
-    } else {
-      state.tracks = repoTracks;
-      selectIndex(0);
-    }
-    renderPlaylists(); saveSettings();
-  });
-  dropzone.addEventListener('dragover', (e)=>{ e.preventDefault(); dropzone.classList.add('dragging'); });
-  dropzone.addEventListener('dragleave', ()=> dropzone.classList.remove('dragging'));
-  dropzone.addEventListener('drop', (e)=>{ e.preventDefault(); dropzone.classList.remove('dragging'); addFiles(e.dataTransfer.files); });
-  search.addEventListener('input', ()=> { renderPlaylists(); saveSettings(); });
-  
-  document.querySelectorAll('input[type="number"], input[type="checkbox"]').forEach(el => el.addEventListener('change', saveSettings));
-
-  // ===== Global Controls (Panic, WakeLock) =====
-  async function requestWakeLock(){
-    if(!('wakeLock' in navigator)) return;
-    try{
-      state.wakeLock = await navigator.wakeLock.request('screen');
-      state.wakeLock.addEventListener('release', ()=>{ wakeLockToggle.checked = false; });
-      wakeLockToggle.checked = true;
-    }catch(e){ console.warn('WakeLock failed', e); }
-  }
-  function releaseWakeLock(){ try{ state.wakeLock?.release(); }catch{} finally{ state.wakeLock=null; wakeLockToggle.checked=false; } }
-  wakeLockToggle.addEventListener('change', ()=>{ wakeLockToggle.checked ? requestWakeLock() : releaseWakeLock(); saveSettings(); });
-  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && wakeLockToggle.checked) requestWakeLock(); });
-  panicBtn.addEventListener('click', ()=>{ rampGain(mainGain, 0, 0.2); rampGain(bgmGain, 0, 0.2); setTimeout(()=>{ stop(); bgmStop(); }, 250); });
-  
-  // ===== Settings Export/Import =====
-  function exportSettings() {
-    saveSettings();
-    const settingsString = localStorage.getItem(SETTINGS_KEY);
-    if (!settingsString) { alert("保存する設定がありません。"); return; }
-    const blob = new Blob([settingsString], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = 'soundboard-settings.json';
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }
-
-  function importSettings(event) {
-    const file = event.target.files[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
+    // ===== WebAudio Graph =====
+    let ctx, mainSrc, bgmSrc, mainGain, bgmGain, analyser, dataArray;
+    function ensureCtx(){
+        if(ctx) return;
         try {
-            const settings = JSON.parse(e.target.result);
-            applySettings(settings);
-            localStorage.setItem(SETTINGS_KEY, e.target.result);
-            alert("設定をインポートしました。");
-        } catch (err) {
-            console.error("設定ファイルの読み込みに失敗しました:", err);
-            alert("設定ファイルの形式が正しくありません。");
+        ctx = new (window.AudioContext || window.webkitAudioContext)();
+        mainSrc = ctx.createMediaElementSource(audio);
+        bgmSrc  = ctx.createMediaElementSource(bgm);
+        mainGain = ctx.createGain(); mainGain.gain.value = 1;
+        bgmGain  = ctx.createGain(); bgmGain.gain.value  = 0.5;
+        analyser = ctx.createAnalyser(); analyser.fftSize = 2048;
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
+        mainSrc.connect(mainGain).connect(analyser).connect(ctx.destination);
+        bgmSrc.connect(bgmGain).connect(ctx.destination);
+        } catch(e) {
+        console.error("AudioContextの初期化に失敗しました。", e);
+        alert("オーディオ機能の初期化に失敗しました。ブラウザが対応していない可能性があります。");
         }
+    }
+    function now(){ ensureCtx(); return ctx.currentTime; }
+    function clamp01(x){ return Math.max(0, Math.min(1, x)); }
+    function rampGain(node, target, sec){
+        ensureCtx();
+        if(!ctx || !node) return;
+        const t = Math.max(0, Number(sec)||0);
+        const n = now();
+        const cur = node.gain.value;
+        node.gain.cancelScheduledValues(n);
+        node.gain.setValueAtTime(cur, n);
+        node.gain.linearRampToValueAtTime(clamp01(target), n + t);
+    }
+
+    // ===== State =====
+    const state = {
+        masterTrackList: [], 
+        tracks: [],
+        bgmTracks: [],
+        filter: '',
+        currentIndex: -1,
+        currentBgmIndex: -1,
+        wakeLock: null,
+        duck: { enable:true, prevVol:0.5 },
     };
-    reader.readAsText(file);
-    event.target.value = '';
-  }
-  
-  exportSettingsBtn.addEventListener('click', exportSettings);
-  importSettingsBtn.addEventListener('click', () => importFile.click());
-  importFile.addEventListener('change', importSettings);
 
-  // ===== Offline Cache Logic =====
-  const AUDIO_CACHE_NAME = 'sound-controller-audio-v1';
-  async function cacheAllAudioFiles() {
-    if (!('caches' in window)) {
-        cacheStatus.textContent = "このブラウザはキャッシュに非対応です。";
-        return;
+    // ===== Common helpers =====
+    function formatTime(sec){
+        if(!isFinite(sec)) return '00:00';
+        sec = Math.max(0, Math.floor(sec));
+        const m = Math.floor(sec / 60).toString().padStart(2,'0');
+        const s = (sec % 60).toString().padStart(2,'0');
+        return `${m}:${s}`;
     }
-    const urlsToCache = state.masterTrackList.map(t => t.path);
-    if (urlsToCache.length === 0) {
-        cacheStatus.textContent = "キャッシュ対象の曲がありません。";
-        return;
-    }
+
+    // ====== UI Refs (All) ======
+    const playlistEl = $('#playlist'), countBadge = $('#countBadge'), titleEl = $('#title'), elapsedEl = $('#elapsed'), durationEl = $('#duration'),
+    remainingEl = $('#remaining'), progress = $('#progress'), progressBar = $('#progressBar'), playPauseBtn = $('#playPause'), stopBtn = $('#stop'),
+    muteBtn = $('#mute'), seekBackBtn = $('#seekBack'), seekFwdBtn = $('#seekFwd'), prevBtn = $('#prevBtn'), nextBtn = $('#nextBtn'),
+    fadeInBtn = $('#fadeInBtn'), fadeOutBtn = $('#fadeOutBtn'), fadeStopBtn = $('#fadeStopBtn'), fadeInSec = $('#fadeInSec'),
+    fadeOutSec = $('#fadeOutSec'), startFromZero = $('#startFromZero'), volumeSlider = $('#volume'), volNum = $('#volNum'),
+    volDown = $('#volDown'), volUp = $('#volUp'), levelMeter = $('#level'), levelDb = $('#levelDb'), setInBtn = $('#setIn'),
+    setOutBtn = $('#setOut'), goInBtn = $('#goIn'), clearCueBtn = $('#clearCue'), inTimeEl = $('#inTime'), outTimeEl = $('#outTime'),
+    autoAdvance = $('#autoAdvance'), playFromIn = $('#playFromIn'), autoStopAtOut = $('#autoStopAtOut'), panicBtn = $('#panicBtn'),
+    wakeLockToggle = $('#wakeLockToggle'), tabPlaylist = $('#tabPlaylist'), tabBgm = $('#tabBgm'),
+    playlistContainer = $('#playlistContainer'), bgmPlaylistContainer = $('#bgmPlaylistContainer'), addFilesBtn = $('#addFiles'),
+    fileInput = $('#fileInput'), addUrlBtn = $('#addUrl'), addFromRepoBtn = $('#addFromRepoBtn'), clearListBtn = $('#clearList'),
+    search = $('#search'), dropzone = $('#dropzone'), exportSettingsBtn = $('#exportSettingsBtn'),
+    importSettingsBtn = $('#importSettingsBtn'), importFile = $('#importFile'), cacheBtn = $('#cacheBtn'),
+    clearCacheBtn = $('#clearCacheBtn'), cacheStatus = $('#cacheStatus'), bgmPlaylistEl = $('#bgmPlaylist'),
+    bgmCountBadge = $('#bgmCountBadge'), bgmPlayPauseBtn = $('#bgmPlayPause'), bgmStopBtn = $('#bgmStop'),
+    bgmPrevBtn = $('#bgmPrevBtn'), bgmNextBtn = $('#bgmNextBtn'), bgmSeekBack = $('#bgmSeekBack'), bgmSeekFwd = $('#bgmSeekFwd'),
+    bgmFadeInBtn = $('#bgmFadeIn'), bgmFadeOutBtn = $('#bgmFadeOut'), bgmFadeStopBtn = $('#bgmFadeStop'),
+    bgmFadeInSec = $('#bgmFadeInSec'), bgmFadeOutSec = $('#bgmFadeOutSec'), bgmStartFromZero = $('#bgmStartFromZero'),
+    bgmVolume = $('#bgmVolume'), bgmVolNum = $('#bgmVolNum'), bgmVolDown = $('#bgmVolDown'), bgmVolUp = $('#bgmVolUp'),
+    bgmLoop = $('#bgmLoop'), bgmTitle = $('#bgmTitle'), bgmProgress = $('#bgmProgress'), bgmProgressBar = $('#bgmProgressBar'),
+    bgmElapsedEl = $('#bgmElapsed'), bgmDurationEl = $('#bgmDuration'), bgmRemainingEl = $('#bgmRemaining'),
+    bgmSetInBtn = $('#bgmSetIn'), bgmSetOutBtn = $('#bgmSetOut'), bgmGoInBtn = $('#bgmGoIn'), bgmClearCueBtn = $('#bgmClearCue'),
+    bgmInTimeEl = $('#bgmInTime'), bgmOutTimeEl = $('#bgmOutTime'), bgmAutoStopAtOut = $('#bgmAutoStopAtOut'),
+    duckEnable = $('#duckEnable'), duckTarget = $('#duckTarget'), duckSec = $('#duckSec'), unduckSec = $('#unduckSec');
     
-    cacheBtn.disabled = true;
-    clearCacheBtn.disabled = true;
-    
-    try {
-        const cache = await caches.open(AUDIO_CACHE_NAME);
-        let count = 0;
-        for (const url of urlsToCache) {
-            count++;
-            cacheStatus.textContent = `準備中... (${count}/${urlsToCache.length})`;
-            try {
-                const existing = await cache.match(url);
-                if (!existing) {
-                    await cache.add(new Request(url, { cache: 'reload' }));
+    // ===== Settings (localStorage) =====
+    const SETTINGS_KEY = 'soundboard.settings.v5';
+    function saveSettings(){
+        try {
+            const trackData = {};
+            const uniqueTracks = new Map();
+            [...state.masterTrackList, ...state.tracks, ...state.bgmTracks].forEach(t => {
+                if (t.path && !uniqueTracks.has(t.path)) {
+                    uniqueTracks.set(t.path, t);
                 }
-            } catch (e) {
-                console.warn(`キャッシュ失敗: ${url}`, e);
-            }
-        }
-        cacheStatus.textContent = `${urlsToCache.length}曲をオフライン用に準備しました。`;
-    } catch (err) {
-        console.error('キャッシュ処理エラー:', err);
-        cacheStatus.textContent = "エラーが発生しました。";
-    } finally {
-        cacheBtn.disabled = false;
-        clearCacheBtn.disabled = false;
+            });
+            uniqueTracks.forEach(t => {
+                trackData[t.path] = { cueIn: t.cueIn, cueOut: t.cueOut, volume: t.volume };
+            });
+            
+            const settings = {
+                version: 5,
+                playlistOrder: state.tracks.map(t => t.path).filter(Boolean),
+                bgmPlaylistOrder: state.bgmTracks.map(t => t.path).filter(Boolean),
+                trackData,
+                currentIndex: state.currentIndex,
+                currentBgmIndex: state.currentBgmIndex,
+                toggles: {
+                    wakeLock: wakeLockToggle.checked,
+                    autoAdvance: autoAdvance.checked, playFromIn: playFromIn.checked, autoStopAtOut: autoStopAtOut.checked,
+                    bgmLoop: bgmLoop.checked, bgmAutoStopAtOut: bgmAutoStopAtOut.checked, duckEnable: duckEnable.checked,
+                    mainStartFromZero: startFromZero.checked, bgmStartFromZero: bgmStartFromZero.checked
+                },
+                fadeSec: { mainIn: fadeInSec.value, mainOut: fadeOutSec.value, bgmIn: bgmFadeInSec.value, bgmOut: bgmFadeOutSec.value },
+                duckParams: { target: duckTarget.value, duck: duckSec.value, unduck: unduckSec.value },
+                ui: {
+                    searchFilter: search.value,
+                    activeTab: bgmPlaylistContainer.classList.contains('hidden') ? 'playlist' : 'bgm'
+                }
+            };
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+        } catch(e) { console.warn('設定の保存に失敗しました', e); }
     }
-  }
+    function loadSettings(){
+        try {
+            const raw = localStorage.getItem(SETTINGS_KEY);
+            if(!raw) return null;
+            const data = JSON.parse(raw);
+            if (data.version !== 5) {
+                console.warn("古いバージョンの設定です。一部が正しく復元されない可能性があります。");
+                localStorage.removeItem(SETTINGS_KEY);
+                return null;
+            }
+            return data;
+        } catch(e) { console.warn('設定の読み込みに失敗しました', e); return null; }
+    }
 
-  async function clearAudioCache() {
-      if (!('caches' in window)) {
-          cacheStatus.textContent = "このブラウザはキャッシュに非対応です。";
-          return;
-      }
-      cacheBtn.disabled = true;
-      clearCacheBtn.disabled = true;
-      cacheStatus.textContent = "キャッシュを削除中...";
-      try {
-          await caches.delete(AUDIO_CACHE_NAME);
-          cacheStatus.textContent = "キャッシュを削除しました。";
-      } catch (err) {
-          console.error('キャッシュ削除エラー:', err);
-          cacheStatus.textContent = "削除中にエラーが発生しました。";
-      } finally {
-          cacheBtn.disabled = false;
-          clearCacheBtn.disabled = false;
-      }
-  }
-
-  cacheBtn.addEventListener('click', cacheAllAudioFiles);
-  clearCacheBtn.addEventListener('click', clearAudioCache);
-  
-  // ===== GitHub Loader & Initialization =====
-  async function loadPlaylistFromGitHub(){
-    const host = window.location.hostname;
-    const pathParts = window.location.pathname.split('/').filter(p => p);
-    if(!host.endsWith('github.io')){ console.warn("GitHub Pagesではないため、自動読み込みをスキップします。"); return null; }
-    
-    const owner = host.split('.')[0];
-    const repo = pathParts.length > 0 ? pathParts[0] : `${owner}.github.io`;
-    if(!owner || !repo){ console.error("リポジトリ情報を取得できませんでした。"); return null; }
-
-    const initialUrl = `https://api.github.com/repos/${owner}/${repo}/contents/audio?per_page=100`;
-    let allFiles = [];
-    let nextUrl = initialUrl;
-
-    try {
-      while(nextUrl) {
-        const res = await fetch(nextUrl);
-        if(!res.ok) throw new Error(`GitHub APIエラー (${res.status})。'audio'フォルダとリポジトリの公開設定を確認してください。`);
+    // ===== Playlist & UI Rendering =====
+    function createPlaylistItem(track, index, isBgm = false, listLength) {
+        const q = (search.value||'').trim().toLowerCase();
+        if(q && !track.name.toLowerCase().includes(q)) return null;
         
-        const files = await res.json();
-        allFiles.push(...files);
-
-        const linkHeader = res.headers.get('Link');
-        const nextLink = linkHeader?.match(/<([^>]+)>;\s*rel="next"/);
-        nextUrl = nextLink ? nextLink[1] : null;
-      }
-
-      const audioExtensions = ['.mp3', '.wav', '.ogg', '.flac', '.m4a', '.aac'];
-      return allFiles
-        .filter(f => f.type === 'file' && audioExtensions.some(ext => f.name.toLowerCase().endsWith(ext)))
-        .map(f => ({ name: f.name.replace(/\.[^/.]+$/, ""), path: f.path }));
-    } catch(e) { console.error(e); alert(e.message); return null; }
-  }
-
-  function applySettings(settings) {
-    if (settings.toggles) {
-        autoAdvance.checked = !!settings.toggles.autoAdvance; playFromIn.checked = !!settings.toggles.playFromIn;
-        autoStopAtOut.checked = !!settings.toggles.autoStopAtOut; bgmLoop.checked = !!settings.toggles.bgmLoop;
-        bgmAutoStopAtOut.checked = !!settings.toggles.bgmAutoStopAtOut; duckEnable.checked = !!settings.toggles.duckEnable;
-        startFromZero.checked = !!settings.toggles.mainStartFromZero; bgmStartFromZero.checked = !!settings.toggles.bgmStartFromZero;
-        wakeLockToggle.checked = !!settings.toggles.wakeLock;
-        if(wakeLockToggle.checked) requestWakeLock();
-    }
-    bgm.loop = bgmLoop.checked;
-    
-    if (settings.fadeSec) {
-        fadeInSec.value = settings.fadeSec.mainIn; fadeOutSec.value = settings.fadeSec.mainOut;
-        bgmFadeInSec.value = settings.fadeSec.bgmIn; bgmFadeOutSec.value = settings.fadeSec.bgmOut;
-    }
-    if (settings.duckParams) {
-        duckTarget.value = settings.duckParams.target; duckSec.value = settings.duckParams.duck; unduckSec.value = settings.duckParams.unduck;
-    }
-    if(settings.ui) {
-        search.value = settings.ui.searchFilter || '';
-        if(settings.ui.activeTab === 'bgm') { tabBgm.click(); } else { tabPlaylist.click(); }
-    }
-    
-    const trackMap = new Map(state.masterTrackList.map(t => [t.path, JSON.parse(JSON.stringify(t))]));
-    
-    if (settings.playlistOrder) {
-        state.tracks = settings.playlistOrder.map(path => trackMap.get(path)).filter(Boolean);
-    }
-    if (settings.bgmPlaylistOrder) {
-        state.bgmTracks = settings.bgmPlaylistOrder.map(path => trackMap.get(path)).filter(Boolean);
-    }
-    
-    if (settings.trackData) {
-        [...state.tracks, ...state.bgmTracks].forEach(t => {
-            const savedData = settings.trackData[t.path];
-            if (savedData) {
-                t.cueIn = savedData.cueIn ?? null;
-                t.cueOut = savedData.cueOut ?? null;
-                t.volume = savedData.volume ?? (t.isBgm ? 0.5 : 1.0);
-            }
-        });
-    }
-
-    selectIndex(settings.currentIndex ?? 0, true);
-    selectBgmIndex(settings.currentBgmIndex ?? 0, true);
-
-    renderPlaylists();
-  }
-  
-  addFromRepoBtn.addEventListener('click', showRepoModal);
-  function showRepoModal() {
-    const isBgm = !bgmPlaylistContainer.classList.contains('hidden');
-    const currentList = isBgm ? state.bgmTracks : state.tracks;
-    const currentPaths = new Set(currentList.map(t => t.path));
-    const missingTracks = state.masterTrackList.filter(t => !currentPaths.has(t.path));
-
-    if (missingTracks.length === 0) {
-        alert("すべてのリポジトリ音源がリストにあります。");
-        return;
-    }
-
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
-    
-    const content = document.createElement('div');
-    content.className = 'modal-content';
-    content.innerHTML = `
-        <h3>リポジトリから${isBgm ? 'BGM' : '曲'}を追加</h3>
-        <ul class="modal-list">
-            ${missingTracks.map(t => `
-                <li>
-                    <input type="checkbox" id="track-${t.id}" value="${t.path}">
-                    <label for="track-${t.id}">${t.name}</label>
-                </li>
-            `).join('')}
-        </ul>
-        <div class="modal-footer">
-            <button id="modal-cancel" class="btn">キャンセル</button>
-            <button id="modal-add" class="btn primary">追加</button>
+        const li = document.createElement('li');
+        const isActive = isBgm ? (index === state.currentBgmIndex) : (index === state.currentIndex);
+        if(isActive) li.classList.add('active');
+        
+        const upButton = index > 0 
+            ? `<button class="btn btn-reorder" data-act="move-up" title="上へ">⬆️</button>` 
+            : `<div style="width: 33px; height: 16px;"></div>`;
+        const downButton = index < listLength - 1
+            ? `<button class="btn btn-reorder" data-act="move-down" title="下へ">⬇️</button>`
+            : `<div style="width: 33px; height: 16px;"></div>`;
+        
+        li.innerHTML = `
+        <div class="reorder-buttons">
+            ${upButton}
+            ${downButton}
         </div>
-    `;
-    overlay.appendChild(content);
-    document.body.appendChild(overlay);
+        <span class="name" title="タップで選択">${track.name}</span>
+        ${track.cueIn!=null ? `<span class="badge">IN ${formatTime(track.cueIn)}</span>`: ''}
+        ${track.cueOut!=null ? `<span class="badge">OUT ${formatTime(track.cueOut)}</span>`: ''}
+        <button class="btn" data-act="play">▶</button>
+        <button class="btn" data-act="remove" title="削除">✖</button>
+        `;
+        
+        li.querySelector('.name').addEventListener('click', () => isBgm ? selectBgmIndex(index) : selectIndex(index));
+        li.querySelector('[data-act="play"]').addEventListener('click', (e) => {
+        e.stopPropagation();
+        if(isBgm) {
+            selectBgmIndex(index);
+            bgm.paused ? bgmPlay() : bgmPause();
+        } else {
+            selectIndex(index);
+            audio.paused ? play() : pause();
+        }
+        });
+        li.querySelector('[data-act="remove"]').addEventListener('click', (e) => { e.stopPropagation(); removeAt(index, isBgm); });
+        
+        const upBtn = li.querySelector('[data-act="move-up"]');
+        if (upBtn) upBtn.addEventListener('click', (e) => { e.stopPropagation(); moveItem(index, index - 1, isBgm); });
+        
+        const downBtn = li.querySelector('[data-act="move-down"]');
+        if (downBtn) downBtn.addEventListener('click', (e) => { e.stopPropagation(); moveItem(index, index + 1, isBgm); });
 
-    overlay.addEventListener('click', (e) => { if(e.target === overlay) overlay.remove(); });
-    content.querySelector('#modal-cancel').addEventListener('click', () => overlay.remove());
-    content.querySelector('#modal-add').addEventListener('click', () => {
-        const selectedPaths = [...content.querySelectorAll('input:checked')].map(input => input.value);
-        const tracksToAdd = state.masterTrackList.filter(t => selectedPaths.includes(t.path));
-        
-        const newTracks = JSON.parse(JSON.stringify(tracksToAdd));
+        return li;
+    }
+
+    function renderPlaylists() {
+        playlistEl.innerHTML = '';
+        state.tracks.forEach((t, i, arr) => {
+        const li = createPlaylistItem(t, i, false, arr.length);
+        if(li) playlistEl.appendChild(li);
+        });
+        countBadge.textContent = `${state.tracks.length} 曲`;
+
+        bgmPlaylistEl.innerHTML = '';
+        state.bgmTracks.forEach((t, i, arr) => {
+        const li = createPlaylistItem(t, i, true, arr.length);
+        if(li) bgmPlaylistEl.appendChild(li);
+        });
+        bgmCountBadge.textContent = `${state.bgmTracks.length} 曲`;
+    }
+    
+    function moveItem(from, to, isBgm){
+        if(from === to || to < 0 || to >= (isBgm ? state.bgmTracks.length : state.tracks.length)) return;
         const targetArray = isBgm ? state.bgmTracks : state.tracks;
-        targetArray.push(...newTracks);
-        
+        const item = targetArray.splice(from, 1)[0];
+        targetArray.splice(to, 0, item);
+
+        if (isBgm) {
+        if(state.currentBgmIndex === from) state.currentBgmIndex = to;
+        else if(from < state.currentBgmIndex && to >= state.currentBgmIndex) state.currentBgmIndex--; 
+        else if(from > state.currentBgmIndex && to <= state.currentBgmIndex) state.currentBgmIndex++;
+        } else {
+        if(state.currentIndex === from) state.currentIndex = to;
+        else if(from < state.currentIndex && to >= state.currentIndex) state.currentIndex--; 
+        else if(from > state.currentIndex && to <= state.currentIndex) state.currentIndex++;
+        }
         renderPlaylists();
         saveSettings();
-        overlay.remove();
-    });
-  }
-
-  async function initialize(){
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').then(registration => {
-          console.log('ServiceWorker registration successful with scope: ', registration.scope);
-        }, err => {
-          console.log('ServiceWorker registration failed: ', err);
-        });
-      });
     }
     
-    cacheStatus.textContent = 'リポジトリから曲を読み込み中...';
-    const githubFiles = await loadPlaylistFromGitHub();
-    cacheStatus.textContent = githubFiles ? `${githubFiles.length}曲を発見しました。` : '曲の読み込みに失敗しました。';
+    function selectIndex(idx, forceReload = false){
+        if (idx < 0 || idx >= state.tracks.length) return;
+        const old = state.currentIndex;
+        state.currentIndex = idx;
+        
+        const tr = state.tracks[idx];
+        if(!tr) { titleEl.textContent = '—'; audio.src = ''; return; }
+        
+        setMainVol(tr.volume ?? 1.0, false);
+        
+        titleEl.textContent = tr.name;
+        inTimeEl.textContent = tr.cueIn != null ? formatTime(tr.cueIn) : '—';
+        outTimeEl.textContent = tr.cueOut != null ? formatTime(tr.cueOut) : '—';
+        
+        if (audio.src !== tr.url || forceReload) {
+            audio.src = tr.url;
+            audio.load();
+            if(old !== idx) pause();
+        }
+        renderPlaylists();
+        saveSettings();
+    }
+
+    function selectBgmIndex(idx, forceReload = false) {
+        if (idx < 0 || idx >= state.bgmTracks.length) return;
+        const old = state.currentBgmIndex;
+        state.currentBgmIndex = idx;
+        
+        const tr = state.bgmTracks[idx];
+        if(!tr) { bgmTitle.textContent = '—'; bgm.src = ''; return; }
+
+        setBgmVol(tr.volume ?? 0.5, false);
+
+        bgmTitle.textContent = tr.name;
+        bgmInTimeEl.textContent = tr.cueIn != null ? formatTime(tr.cueIn) : '—';
+        bgmOutTimeEl.textContent = tr.cueOut != null ? formatTime(tr.cueOut) : '—';
+
+        if (bgm.src !== tr.url || forceReload) {
+            bgm.src = tr.url;
+            bgm.load();
+            if(old !== idx) bgmPause();
+        }
+        renderPlaylists();
+        saveSettings();
+    }
+
+    function removeAt(i, isBgm){
+        const targetArray = isBgm ? state.bgmTracks : state.tracks;
+        const removedTrack = targetArray[i];
+        
+        if (removedTrack.kind === 'repo') {
+            targetArray.splice(i,1);
+        } else {
+            const [removed] = targetArray.splice(i,1);
+            try{ if(removed.kind==='local' && removed.url.startsWith('blob:')) URL.revokeObjectURL(removed.url);}catch{}
+        }
+        
+        if (isBgm) {
+        if(state.currentBgmIndex === i){
+            bgmPause(); bgm.src = '';
+            const newIndex = Math.min(i, targetArray.length - 1);
+            state.currentBgmIndex = -1;
+            selectBgmIndex(newIndex);
+        } else if(i < state.currentBgmIndex) {
+            state.currentBgmIndex--;
+        }
+        } else {
+        if(state.currentIndex === i){
+            pause(); audio.src='';
+            const newIndex = Math.min(i, targetArray.length - 1);
+            state.currentIndex = -1;
+            selectIndex(newIndex);
+        } else if(i < state.currentIndex) {
+            state.currentIndex--;
+        }
+        }
+        renderPlaylists();
+        saveSettings();
+    }
+
+    // ===== File/URL/Drop Handling =====
+    function addFiles(files, kind='local'){
+        const isBgmActive = !bgmPlaylistContainer.classList.contains('hidden');
+        const targetArray = isBgmActive ? state.bgmTracks : state.tracks;
+
+        Array.from(files || []).forEach(f => {
+        const url = URL.createObjectURL(f);
+        targetArray.push({id:crypto.randomUUID(), name:f.name, url, kind, path:null, cueIn:null, cueOut:null, volume: isBgmActive ? 0.5 : 1.0});
+        });
+        
+        if (isBgmActive) {
+            if(state.currentBgmIndex < 0 && targetArray.length) selectBgmIndex(0); else renderPlaylists();
+        } else {
+            if(state.currentIndex < 0 && targetArray.length) selectIndex(0); else renderPlaylists();
+        }
+    }
+    function addUrlPrompt(){
+        const url = prompt('音源URLを貼り付け (mp3, wav 等)');
+        if(!url) return;
+        const name = prompt('曲名 (省略可)') || url.split('/').pop();
+        const isBgmActive = !bgmPlaylistContainer.classList.contains('hidden');
+        const targetArray = isBgmActive ? state.bgmTracks : state.tracks;
+        targetArray.push({id:crypto.randomUUID(), name, url, kind:'url', path:url, cueIn:null, cueOut:null, volume: isBgmActive ? 0.5 : 1.0});
+
+        if (isBgmActive) {
+            if(state.currentBgmIndex < 0) selectBgmIndex(0); else renderPlaylists();
+        } else {
+            if(state.currentIndex < 0) selectIndex(0); else renderPlaylists();
+        }
+        saveSettings();
+    }
     
-    state.masterTrackList = (githubFiles || []).map(item => ({
-        id: crypto.randomUUID(), name: item.name, url: item.path, path: item.path,
-        kind: 'repo', cueIn: null, cueOut: null, volume: 1.0
-    }));
+    // ===== Main Transport =====
+    async function play(){
+        ensureCtx(); if(!ctx) return;
+        await ctx.resume();
+        const tr = state.tracks[state.currentIndex];
+        if(!tr) return;
 
-    state.tracks = JSON.parse(JSON.stringify(state.masterTrackList));
-    const bgmBaseTracks = JSON.parse(JSON.stringify(state.masterTrackList));
-    bgmBaseTracks.forEach(t => t.volume = 0.5);
-    state.bgmTracks = bgmBaseTracks;
+        rampGain(mainGain, startFromZero.checked ? 0 : (tr.volume ?? 1.0), 0);
 
-    const settings = loadSettings();
-    if (settings) {
-        applySettings(settings);
-    } else {
-        selectIndex(0);
+        if(tr.cueIn != null && playFromIn.checked && audio.currentTime < tr.cueIn){ audio.currentTime = tr.cueIn; }
+        
+        if(duckEnable.checked){
+        state.duck.prevVol = bgmGain.gain.value;
+        rampGain(bgmGain, Number(duckTarget.value)/100, Number(duckSec.value));
+        }
+        try{
+        await audio.play();
+        playPauseBtn.textContent = '⏸️ 一時停止'; playPauseBtn.classList.remove('primary');
+        }catch(err){ console.error('再生エラー', err); alert('再生できませんでした: ' + err.message); }
+    }
+    function pause(){
+        audio.pause();
+        playPauseBtn.textContent = '▶️ 再生'; playPauseBtn.classList.add('primary');
+        if(duckEnable.checked){ rampGain(bgmGain, state.duck.prevVol, Number(unduckSec.value)); }
+    }
+    function stop(){
+        audio.pause(); audio.currentTime = 0;
+        playPauseBtn.textContent='▶️ 再生'; playPauseBtn.classList.add('primary');
+        if(duckEnable.checked){ rampGain(bgmGain, state.duck.prevVol, Number(unduckSec.value)); }
+    }
+    function fadeMainTo(target, sec, {stopAfter=false}={}){
+        rampGain(mainGain, target, Number(sec)||0);
+        if(stopAfter && target <= 0.001){
+        setTimeout(()=>{ stop(); }, (Number(sec)||0)*1000 + 50);
+        }
+    }
+
+    // ===== Main Meters & Time Update =====
+    function updMainTime(){
+        const d = audio.duration||0, c = audio.currentTime||0;
+        elapsedEl.textContent = formatTime(c);
+        durationEl.textContent = formatTime(d);
+        remainingEl.textContent = formatTime(Math.max(0, d-c));
+        progressBar.style.width = `${d ? (c/d*100) : 0}%`;
+    }
+    function updLevel(){
+        if(!analyser) return;
+        analyser.getByteTimeDomainData(dataArray);
+        let sum = 0; for(let i=0;i<dataArray.length;i++){ const v=(dataArray[i]-128)/128; sum+=v*v; }
+        const rms=Math.sqrt(sum/dataArray.length)||1e-7, db=20*Math.log10(rms);
+        levelMeter.value = Math.max(-60, Math.min(0, db));
+        levelDb.textContent = (db<=-59?'-∞':db.toFixed(1)) + ' dB';
+    }
+    function checkCueOutAutoStop(){
+        const tr = state.tracks[state.currentIndex];
+        if(!tr) return;
+        if(autoStopAtOut.checked && tr.cueOut!=null){
+        const remain = tr.cueOut - audio.currentTime;
+        if(remain <= 0.05){ stop(); }
+        else if(remain > 0 && remain < 0.3){
+            const sec = Math.max(0.15, Number(fadeOutSec.value));
+            fadeMainTo(0, Math.min(sec, remain+0.05), {stopAfter:true});
+        }
+        }
+    }
+
+    // ===== Main Player Events =====
+    playPauseBtn.addEventListener('click', ()=> audio.paused ? play() : pause() );
+    stopBtn.addEventListener('click', stop);
+    seekBackBtn.addEventListener('click', ()=>{ audio.currentTime = Math.max(0, audio.currentTime - 5); });
+    seekFwdBtn.addEventListener('click', ()=>{ const d=audio.duration||0; audio.currentTime = Math.min(d, audio.currentTime + 5); });
+    prevBtn.addEventListener('click', () => { if (state.currentIndex > 0) selectIndex(state.currentIndex - 1); });
+    nextBtn.addEventListener('click', () => { if (state.currentIndex < state.tracks.length - 1) selectIndex(state.currentIndex + 1); });
+    
+    fadeInBtn.addEventListener('click', ()=>{
+        const tr = state.tracks[state.currentIndex]; if(!tr) return;
+        if(audio.paused) play();
+        if(startFromZero.checked) rampGain(mainGain, 0, 0);
+        rampGain(mainGain, tr.volume ?? 1.0, Number(fadeInSec.value));
+    });
+    fadeOutBtn.addEventListener('click', ()=> fadeMainTo(0, Number(fadeOutSec.value)) );
+    fadeStopBtn.addEventListener('click', ()=> fadeMainTo(0, Number(fadeOutSec.value), {stopAfter:true}) );
+
+    progress.addEventListener('click', (e)=>{
+        const r = progress.getBoundingClientRect();
+        const ratio = clamp01((e.clientX - r.left) / r.width);
+        if(isFinite(audio.duration)) audio.currentTime = ratio * audio.duration;
+    });
+
+    function setMainVol(v, save=true){
+        ensureCtx();
+        const val = clamp01(v);
+        if(mainGain) mainGain.gain.value = val;
+        volumeSlider.value = String(val);
+        volNum.value = String(Math.round(val*100));
+        
+        const currentTrack = state.tracks[state.currentIndex];
+        if(currentTrack) { currentTrack.volume = val; }
+
+        if(save) saveSettings();
+    }
+    volumeSlider.addEventListener('input', ()=> setMainVol(Number(volumeSlider.value)) );
+    volNum.addEventListener('input', ()=> setMainVol(Number(volNum.value)/100));
+    volDown.addEventListener('click', ()=> setMainVol(mainGain.gain.value - 0.05));
+    volUp.addEventListener('click', ()=> setMainVol(mainGain.gain.value + 0.05));
+    muteBtn.addEventListener('click', ()=> setMainVol(mainGain.gain.value > 0 ? 0 : (state.tracks[state.currentIndex]?.volume || 1)) );
+
+    setInBtn.addEventListener('click', ()=>{ const tr = state.tracks[state.currentIndex]; if(!tr) return; tr.cueIn=Math.floor(audio.currentTime); renderPlaylists(); saveSettings(); });
+    setOutBtn.addEventListener('click', ()=>{ const tr = state.tracks[state.currentIndex]; if(!tr) return; tr.cueOut=Math.floor(audio.currentTime); renderPlaylists(); saveSettings(); });
+    goInBtn.addEventListener('click', ()=>{ const tr = state.tracks[state.currentIndex]; if(tr && tr.cueIn!=null){ audio.currentTime = tr.cueIn; }});
+    clearCueBtn.addEventListener('click', ()=>{ const tr = state.tracks[state.currentIndex]; if(!tr) return; tr.cueIn=null; tr.cueOut=null; renderPlaylists(); saveSettings(); });
+
+    audio.addEventListener('play', ()=>{ if(!rafId) rafId = requestAnimationFrame(loop); });
+    audio.addEventListener('pause', ()=>{ if(rafId) { cancelAnimationFrame(rafId); rafId=null; } });
+    audio.addEventListener('loadedmetadata', updMainTime);
+    audio.addEventListener('timeupdate', updMainTime);
+    audio.addEventListener('ended', ()=>{
+        if(autoAdvance.checked){
+        const next = state.currentIndex + 1;
+        if(state.tracks[next]){ selectIndex(next); play(); }
+        else { stop(); }
+        }else{ stop(); }
+    });
+
+    // ===== BGM Transport & Events =====
+    async function bgmPlay(){
+        ensureCtx(); if(!ctx) return;
+        await ctx.resume();
+        const tr = state.bgmTracks[state.currentBgmIndex];
+        if(!tr) return;
+        
+        rampGain(bgmGain, bgmStartFromZero.checked ? 0 : (tr.volume ?? 0.5), 0);
+
+        if(tr.cueIn != null && bgm.currentTime < tr.cueIn) { bgm.currentTime = tr.cueIn; }
+
+        try {
+        await bgm.play();
+        } catch(e) { alert('BGM再生失敗: '+e.message); }
+    }
+    function bgmPause(){
+        bgm.pause();
+    }
+    function bgmStop(){
+        bgmPause();
+        bgm.currentTime = 0;
+    }
+    function bgmFadeTo(target, sec, {stopAfter=false}={}){
+        rampGain(bgmGain, target, Number(sec));
+        if(stopAfter && target <= 0.001){
+        setTimeout(()=>{ bgmStop(); }, (Number(sec))*1000 + 50);
+        }
+    }
+
+    function updBgmTime(){
+        const d = bgm.duration||0, c = bgm.currentTime||0;
+        bgmElapsedEl.textContent = formatTime(c);
+        bgmDurationEl.textContent = formatTime(d);
+        bgmRemainingEl.textContent = formatTime(Math.max(0, d-c));
+        bgmProgressBar.style.width = `${d ? (c/d*100) : 0}%`;
+    }
+    function checkBgmCueAutoStop(){
+        const tr = state.bgmTracks[state.currentBgmIndex];
+        if(!tr) return;
+        if(bgmAutoStopAtOut.checked && tr.cueOut != null){
+        const remain = tr.cueOut - bgm.currentTime;
+        if(remain <= 0.05){ bgmStop(); }
+        else if(remain > 0 && remain < 0.3){
+            const sec = Math.max(0.15, Number(bgmFadeOutSec.value));
+            bgmFadeTo(0, Math.min(sec, remain + 0.05), {stopAfter:true});
+        }
+        }
+    }
+    
+    bgmPlayPauseBtn.addEventListener('click', ()=> bgm.paused ? bgmPlay() : bgmPause());
+    bgmStopBtn.addEventListener('click', bgmStop);
+    bgmPrevBtn.addEventListener('click', () => { if (state.currentBgmIndex > 0) selectBgmIndex(state.currentBgmIndex - 1); });
+    bgmNextBtn.addEventListener('click', () => { if (state.currentBgmIndex < state.bgmTracks.length - 1) selectBgmIndex(state.currentBgmIndex + 1); });
+    
+    bgmFadeInBtn.addEventListener('click', ()=>{
+        const tr = state.bgmTracks[state.currentBgmIndex]; if(!tr) return;
+        if(bgm.paused) bgmPlay();
+        if(bgmStartFromZero.checked) rampGain(bgmGain, 0, 0);
+        rampGain(bgmGain, tr.volume ?? 0.5, Number(bgmFadeInSec.value));
+    });
+    bgmFadeOutBtn.addEventListener('click', ()=> bgmFadeTo(0, Number(bgmFadeOutSec.value)) );
+    bgmFadeStopBtn.addEventListener('click', ()=> bgmFadeTo(0, Number(bgmFadeOutSec.value), {stopAfter:true}) );
+
+    function setBgmVol(v, save=true){
+        ensureCtx();
+        const val = clamp01(v);
+        if(bgmGain) bgmGain.gain.value = val;
+        bgmVolume.value = String(val);
+        bgmVolNum.value = String(Math.round(val*100));
+
+        const currentTrack = state.bgmTracks[state.currentBgmIndex];
+        if(currentTrack) { currentTrack.volume = val; }
+
+        if(save) saveSettings();
+    }
+    bgmVolume.addEventListener('input', ()=> setBgmVol(Number(bgmVolume.value)) );
+    bgmVolNum.addEventListener('input', ()=> setBgmVol(Number(bgmVolNum.value)/100));
+    bgmVolDown.addEventListener('click', ()=> setBgmVol(bgmGain.gain.value - 0.05) );
+    bgmVolUp.addEventListener('click', ()=> setBgmVol(bgmGain.gain.value + 0.05) );
+
+    bgmProgress.addEventListener('click', (e)=>{
+        const r = bgmProgress.getBoundingClientRect();
+        const ratio = clamp01((e.clientX - r.left) / r.width);
+        if(isFinite(bgm.duration)) bgm.currentTime = ratio * bgm.duration;
+    });
+
+    bgmSetInBtn.addEventListener('click', ()=>{ const tr = state.bgmTracks[state.currentBgmIndex]; if(!tr) return; tr.cueIn = Math.floor(bgm.currentTime); renderPlaylists(); saveSettings(); });
+    bgmSetOutBtn.addEventListener('click', ()=>{ const tr = state.bgmTracks[state.currentBgmIndex]; if(!tr) return; tr.cueOut = Math.floor(bgm.currentTime); renderPlaylists(); saveSettings(); });
+    bgmGoInBtn.addEventListener('click', ()=>{ const tr = state.bgmTracks[state.currentBgmIndex]; if(tr && tr.cueIn!=null){ bgm.currentTime = tr.cueIn; }});
+    bgmClearCueBtn.addEventListener('click', ()=>{ const tr = state.bgmTracks[state.currentBgmIndex]; if(!tr) return; tr.cueIn=null; tr.cueOut=null; renderPlaylists(); saveSettings(); });
+    bgm.addEventListener('loadedmetadata', updBgmTime);
+    bgm.addEventListener('timeupdate', updBgmTime);
+    bgm.addEventListener('play', () => { bgmPlayPauseBtn.textContent = '⏸️ BGM停止'; bgmPlayPauseBtn.classList.remove('ok'); });
+    bgm.addEventListener('pause', () => { bgmPlayPauseBtn.textContent = '▶️ BGM再生'; bgmPlayPauseBtn.classList.add('ok'); });
+    bgmLoop.addEventListener('change', () => { bgm.loop = bgmLoop.checked; saveSettings(); });
+
+    // ===== Left Panel Logic =====
+    tabPlaylist.addEventListener('click', () => {
+        tabPlaylist.classList.add('active'); tabBgm.classList.remove('active');
+        playlistContainer.classList.remove('hidden'); bgmPlaylistContainer.classList.add('hidden');
+        saveSettings();
+    });
+    tabBgm.addEventListener('click', () => {
+        tabBgm.classList.add('active'); tabPlaylist.classList.remove('active');
+        bgmPlaylistContainer.classList.remove('hidden'); playlistContainer.classList.add('hidden');
+        saveSettings();
+    });
+    addFilesBtn.addEventListener('click', ()=> fileInput.click());
+    fileInput.addEventListener('change', (e)=> addFiles(e.target.files));
+    addUrlBtn.addEventListener('click', addUrlPrompt);
+    clearListBtn.addEventListener('click', ()=>{
+        const isBgmActive = !bgmPlaylistContainer.classList.contains('hidden');
+        const targetArray = isBgmActive ? state.bgmTracks : state.tracks;
+        const repoTracks = targetArray.filter(t => t.kind === 'repo');
+        targetArray.forEach(t=>{ if(t.kind==='local' && t.url.startsWith('blob:')) try{URL.revokeObjectURL(t.url);}catch{} });
+        
+        if (isBgmActive) {
+        state.bgmTracks = repoTracks;
         selectBgmIndex(0);
+        } else {
+        state.tracks = repoTracks;
+        selectIndex(0);
+        }
+        renderPlaylists(); saveSettings();
+    });
+    dropzone.addEventListener('dragover', (e)=>{ e.preventDefault(); dropzone.classList.add('dragging'); });
+    dropzone.addEventListener('dragleave', ()=> dropzone.classList.remove('dragging'));
+    dropzone.addEventListener('drop', (e)=>{ e.preventDefault(); dropzone.classList.remove('dragging'); addFiles(e.dataTransfer.files); });
+    search.addEventListener('input', ()=> { renderPlaylists(); saveSettings(); });
+    
+    document.querySelectorAll('input[type="number"], input[type="checkbox"]').forEach(el => el.addEventListener('change', saveSettings));
+
+    // ===== Global Controls (Panic, WakeLock) =====
+    async function requestWakeLock(){
+        if(!('wakeLock' in navigator)) return;
+        try{
+        state.wakeLock = await navigator.wakeLock.request('screen');
+        state.wakeLock.addEventListener('release', ()=>{ wakeLockToggle.checked = false; });
+        wakeLockToggle.checked = true;
+        }catch(e){ console.warn('WakeLock failed', e); }
+    }
+    function releaseWakeLock(){ try{ state.wakeLock?.release(); }catch{} finally{ state.wakeLock=null; wakeLockToggle.checked=false; } }
+    wakeLockToggle.addEventListener('change', ()=>{ wakeLockToggle.checked ? requestWakeLock() : releaseWakeLock(); saveSettings(); });
+    document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && wakeLockToggle.checked) requestWakeLock(); });
+    panicBtn.addEventListener('click', ()=>{ rampGain(mainGain, 0, 0.2); rampGain(bgmGain, 0, 0.2); setTimeout(()=>{ stop(); bgmStop(); }, 250); });
+    
+    // ===== Settings Export/Import =====
+    function exportSettings() {
+        saveSettings();
+        const settingsString = localStorage.getItem(SETTINGS_KEY);
+        if (!settingsString) { alert("保存する設定がありません。"); return; }
+        const blob = new Blob([settingsString], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = 'soundboard-settings.json';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    function importSettings(event) {
+        const file = event.target.files[0]; if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const settings = JSON.parse(e.target.result);
+                applySettings(settings);
+                localStorage.setItem(SETTINGS_KEY, e.target.result);
+                alert("設定をインポートしました。");
+            } catch (err) {
+                console.error("設定ファイルの読み込みに失敗しました:", err);
+                alert("設定ファイルの形式が正しくありません。");
+            }
+        };
+        reader.readAsText(file);
+        event.target.value = '';
+    }
+    
+    exportSettingsBtn.addEventListener('click', exportSettings);
+    importSettingsBtn.addEventListener('click', () => importFile.click());
+    importFile.addEventListener('change', importSettings);
+
+    // ===== Offline Cache Logic =====
+    const AUDIO_CACHE_NAME = 'sound-controller-audio-v1';
+    async function cacheAllAudioFiles() {
+        if (!('caches' in window)) {
+            cacheStatus.textContent = "このブラウザはキャッシュに非対応です。";
+            return;
+        }
+        const urlsToCache = state.masterTrackList.map(t => t.path);
+        if (urlsToCache.length === 0) {
+            cacheStatus.textContent = "キャッシュ対象の曲がありません。";
+            return;
+        }
+        
+        cacheBtn.disabled = true;
+        clearCacheBtn.disabled = true;
+        
+        try {
+            const cache = await caches.open(AUDIO_CACHE_NAME);
+            let count = 0;
+            for (const url of urlsToCache) {
+                count++;
+                cacheStatus.textContent = `準備中... (${count}/${urlsToCache.length})`;
+                try {
+                    const existing = await cache.match(url);
+                    if (!existing) {
+                        await cache.add(new Request(url, { cache: 'reload' }));
+                    }
+                } catch (e) {
+                    console.warn(`キャッシュ失敗: ${url}`, e);
+                }
+            }
+            cacheStatus.textContent = `${urlsToCache.length}曲をオフライン用に準備しました。`;
+        } catch (err) {
+            console.error('キャッシュ処理エラー:', err);
+            cacheStatus.textContent = "エラーが発生しました。";
+        } finally {
+            cacheBtn.disabled = false;
+            clearCacheBtn.disabled = false;
+        }
+    }
+
+    async function clearAudioCache() {
+        if (!('caches' in window)) {
+            cacheStatus.textContent = "このブラウザはキャッシュに非対応です。";
+            return;
+        }
+        cacheBtn.disabled = true;
+        clearCacheBtn.disabled = true;
+        cacheStatus.textContent = "キャッシュを削除中...";
+        try {
+            await caches.delete(AUDIO_CACHE_NAME);
+            cacheStatus.textContent = "キャッシュを削除しました。";
+        } catch (err) {
+            console.error('キャッシュ削除エラー:', err);
+            cacheStatus.textContent = "削除中にエラーが発生しました。";
+        } finally {
+            cacheBtn.disabled = false;
+            clearCacheBtn.disabled = false;
+        }
+    }
+
+    cacheBtn.addEventListener('click', cacheAllAudioFiles);
+    clearCacheBtn.addEventListener('click', clearAudioCache);
+    
+    // ===== GitHub Loader & Initialization =====
+    async function loadPlaylistFromGitHub(){
+        const host = window.location.hostname;
+        const pathParts = window.location.pathname.split('/').filter(p => p);
+        if(!host.endsWith('github.io')){ console.warn("GitHub Pagesではないため、自動読み込みをスキップします。"); return null; }
+        
+        const owner = host.split('.')[0];
+        const repo = pathParts.length > 0 ? pathParts[0] : `${owner}.github.io`;
+        if(!owner || !repo){ console.error("リポジトリ情報を取得できませんでした。"); return null; }
+
+        const initialUrl = `https://api.github.com/repos/${owner}/${repo}/contents/audio?per_page=100`;
+        let allFiles = [];
+        let nextUrl = initialUrl;
+
+        try {
+        while(nextUrl) {
+            const res = await fetch(nextUrl);
+            if(!res.ok) throw new Error(`GitHub APIエラー (${res.status})。'audio'フォルダとリポジトリの公開設定を確認してください。`);
+            
+            const files = await res.json();
+            allFiles.push(...files);
+
+            const linkHeader = res.headers.get('Link');
+            const nextLink = linkHeader?.match(/<([^>]+)>;\s*rel="next"/);
+            nextUrl = nextLink ? nextLink[1] : null;
+        }
+
+        const audioExtensions = ['.mp3', '.wav', '.ogg', '.flac', '.m4a', '.aac'];
+        return allFiles
+            .filter(f => f.type === 'file' && audioExtensions.some(ext => f.name.toLowerCase().endsWith(ext)))
+            .map(f => ({ name: f.name.replace(/\.[^/.]+$/, ""), path: f.path }));
+        } catch(e) { console.error(e); alert(e.message); return null; }
+    }
+
+    function applySettings(settings) {
+        if (settings.toggles) {
+            autoAdvance.checked = !!settings.toggles.autoAdvance; playFromIn.checked = !!settings.toggles.playFromIn;
+            autoStopAtOut.checked = !!settings.toggles.autoStopAtOut; bgmLoop.checked = !!settings.toggles.bgmLoop;
+            bgmAutoStopAtOut.checked = !!settings.toggles.bgmAutoStopAtOut; duckEnable.checked = !!settings.toggles.duckEnable;
+            startFromZero.checked = !!settings.toggles.mainStartFromZero; bgmStartFromZero.checked = !!settings.toggles.bgmStartFromZero;
+            wakeLockToggle.checked = !!settings.toggles.wakeLock;
+            if(wakeLockToggle.checked) requestWakeLock();
+        }
+        bgm.loop = bgmLoop.checked;
+        
+        if (settings.fadeSec) {
+            fadeInSec.value = settings.fadeSec.mainIn; fadeOutSec.value = settings.fadeSec.mainOut;
+            bgmFadeInSec.value = settings.fadeSec.bgmIn; bgmFadeOutSec.value = settings.fadeSec.bgmOut;
+        }
+        if (settings.duckParams) {
+            duckTarget.value = settings.duckParams.target; duckSec.value = settings.duckParams.duck; unduckSec.value = settings.duckParams.unduck;
+        }
+        if(settings.ui) {
+            search.value = settings.ui.searchFilter || '';
+            if(settings.ui.activeTab === 'bgm') { tabBgm.click(); } else { tabPlaylist.click(); }
+        }
+        
+        const trackMap = new Map(state.masterTrackList.map(t => [t.path, JSON.parse(JSON.stringify(t))]));
+        
+        if (settings.playlistOrder) {
+            state.tracks = settings.playlistOrder.map(path => trackMap.get(path)).filter(Boolean);
+        }
+        if (settings.bgmPlaylistOrder) {
+            state.bgmTracks = settings.bgmPlaylistOrder.map(path => trackMap.get(path)).filter(Boolean);
+        }
+        
+        if (settings.trackData) {
+            [...state.tracks, ...state.bgmTracks].forEach(t => {
+                const savedData = settings.trackData[t.path];
+                if (savedData) {
+                    t.cueIn = savedData.cueIn ?? null;
+                    t.cueOut = savedData.cueOut ?? null;
+                    t.volume = savedData.volume ?? (t.isBgm ? 0.5 : 1.0);
+                }
+            });
+        }
+
+        selectIndex(settings.currentIndex ?? 0, true);
+        selectBgmIndex(settings.currentBgmIndex ?? 0, true);
+
         renderPlaylists();
     }
-    bgm.loop = bgmLoop.checked;
     
-    let rafId = null;
-    function loop(){ 
-      updMainTime(); updLevel(); updBgmTime();
-      checkCueOutAutoStop(); checkBgmCueAutoStop();
-      rafId = requestAnimationFrame(loop); 
-    }
-    requestAnimationFrame(loop);
-  }
+    addFromRepoBtn.addEventListener('click', showRepoModal);
+    function showRepoModal() {
+        const isBgm = !bgmPlaylistContainer.classList.contains('hidden');
+        const currentList = isBgm ? state.bgmTracks : state.tracks;
+        const currentPaths = new Set(currentList.map(t => t.path));
+        const missingTracks = state.masterTrackList.filter(t => !currentPaths.has(t.path));
 
-  initialize();
+        if (missingTracks.length === 0) {
+            alert("すべてのリポジトリ音源がリストにあります。");
+            return;
+        }
+
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        
+        const content = document.createElement('div');
+        content.className = 'modal-content';
+        content.innerHTML = `
+            <h3>リポジトリから${isBgm ? 'BGM' : '曲'}を追加</h3>
+            <ul class="modal-list">
+                ${missingTracks.map(t => `
+                    <li>
+                        <input type="checkbox" id="track-${t.id}" value="${t.path}">
+                        <label for="track-${t.id}">${t.name}</label>
+                    </li>
+                `).join('')}
+            </ul>
+            <div class="modal-footer">
+                <button id="modal-cancel" class="btn">キャンセル</button>
+                <button id="modal-add" class="btn primary">追加</button>
+            </div>
+        `;
+        overlay.appendChild(content);
+        document.body.appendChild(overlay);
+
+        overlay.addEventListener('click', (e) => { if(e.target === overlay) overlay.remove(); });
+        content.querySelector('#modal-cancel').addEventListener('click', () => overlay.remove());
+        content.querySelector('#modal-add').addEventListener('click', () => {
+            const selectedPaths = [...content.querySelectorAll('input:checked')].map(input => input.value);
+            const tracksToAdd = state.masterTrackList.filter(t => selectedPaths.includes(t.path));
+            
+            const newTracks = JSON.parse(JSON.stringify(tracksToAdd));
+            const targetArray = isBgm ? state.bgmTracks : state.tracks;
+            targetArray.push(...newTracks);
+            
+            renderPlaylists();
+            saveSettings();
+            overlay.remove();
+        });
+    }
+
+    async function initialize(){
+        if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js').then(registration => {
+            console.log('ServiceWorker registration successful with scope: ', registration.scope);
+            }, err => {
+            console.log('ServiceWorker registration failed: ', err);
+            });
+        });
+        }
+        
+        cacheStatus.textContent = 'リポジトリから曲を読み込み中...';
+        const githubFiles = await loadPlaylistFromGitHub();
+        cacheStatus.textContent = githubFiles ? `${githubFiles.length}曲を発見しました。` : '曲の読み込みに失敗しました。';
+        
+        state.masterTrackList = (githubFiles || []).map(item => ({
+            id: crypto.randomUUID(), name: item.name, url: item.path, path: item.path,
+            kind: 'repo', cueIn: null, cueOut: null, volume: 1.0
+        }));
+
+        state.tracks = JSON.parse(JSON.stringify(state.masterTrackList));
+        const bgmBaseTracks = JSON.parse(JSON.stringify(state.masterTrackList));
+        bgmBaseTracks.forEach(t => t.volume = 0.5);
+        state.bgmTracks = bgmBaseTracks;
+
+        const settings = loadSettings();
+        if (settings) {
+            applySettings(settings);
+        } else {
+            selectIndex(0);
+            selectBgmIndex(0);
+            renderPlaylists();
+        }
+        bgm.loop = bgmLoop.checked;
+        
+        let rafId = null;
+        function loop(){ 
+        updMainTime(); updLevel(); updBgmTime();
+        checkCueOutAutoStop(); checkBgmCueAutoStop();
+        rafId = requestAnimationFrame(loop); 
+        }
+        requestAnimationFrame(loop);
+    }
+    
+    initialize();
+  }
 })();
 </script>
 </body>
