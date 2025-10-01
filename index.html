@@ -76,6 +76,10 @@
   .modal-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex-grow: 1; }
   .modal-list li { display: flex; align-items: center; gap: 10px; padding: 8px; border-bottom: 1px solid var(--border); }
   .modal-footer { margin-top: 16px; display: flex; justify-content: flex-end; gap: 8px; }
+  
+  /* Initial hidden state */
+  .container, header { display: none; }
+
 </style>
 </head>
 <body>
@@ -315,21 +319,24 @@
 // ▼▼▼ パスワード設定 ▼▼▼
 // ここに、SHA-256でハッシュ化したパスワードを貼り付けてください。
 // 例: '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8' (これは 'password' のハッシュです)
-const PASSWORD_HASH = 'e70655085b1b98bc0aa344d7a79a2bc703af1247331a300e490ed3582d854da9';
+const PASSWORD_HASH = 'ここにコピーしたハッシュ値を貼り付け';
 // ▲▲▲ パスワード設定 ▲▲▲
 // ===============================================================
 
-const AUTH_KEY = 'soundboard.auth.session';
-async function hashString(str) {
-    if (!str) return '';
-    const encoder = new TextEncoder();
-    const data = encoder.encode(str);
-    const hash = await crypto.subtle.digest('SHA-256', data);
-    return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
-}
-async function checkAuth() {
+(async () => {
+  const $ = (sel) => document.querySelector(sel);
+  
+  // --- Authentication ---
+  const AUTH_KEY = 'soundboard.auth.session';
+  async function hashString(str) {
+      if (!str) return '';
+      const encoder = new TextEncoder();
+      const data = encoder.encode(str);
+      const hash = await crypto.subtle.digest('SHA-256', data);
+      return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+  async function checkAuth() {
     if (sessionStorage.getItem(AUTH_KEY) === 'ok') return true;
-    
     const enteredPassword = prompt('パスワードを入力してください:');
     if (enteredPassword === null) return null; // User clicked cancel
 
@@ -339,32 +346,38 @@ async function checkAuth() {
         return true;
     }
     return false;
-}
-
-async function runAuthentication() {
+  }
+  
+  async function runAuthentication() {
     if (PASSWORD_HASH === 'ここにコピーしたハッシュ値を貼り付け' || PASSWORD_HASH === '') {
         return true; // No password set, proceed
     }
-
-    while (true) {
+    let authorized = false;
+    while(!authorized) {
         const authResult = await checkAuth();
-        if (authResult === true) return true; // Authorized
-        if (authResult === null) {
-            document.body.innerHTML = '<div style="padding: 20px; text-align:center; color: white;">キャンセルされました。</div>';
-            return false; // Not authorized, stop execution
+        if (authResult === true) {
+            authorized = true;
+        } else if (authResult === null) {
+            document.body.innerHTML = '<div style="padding: 20px; text-align:center;">キャンセルされました。</div>';
+            return false; // Stop execution
+        } else {
+            alert('パスワードが違います。');
         }
-        alert('パスワードが違います。');
     }
-}
+    return true;
+  }
+  
+  const isAuthenticated = await runAuthentication();
+  if (!isAuthenticated) return; // Stop if not authenticated
+  
+  // Show the main content
+  $('.container').style.display = 'grid';
+  $('header').style.display = 'flex';
 
-// Start the application after authentication
-runAuthentication().then(authorized => {
-    if (!authorized) return; // Stop if not authorized
-    
-    // --- App Initialization ---
-    const $ = (sel) => document.querySelector(sel);
-    const audio = $('#audio');
-    const bgm   = $('#bgm');
+
+  // --- App Initialization ---
+  const audio = $('#audio');
+  const bgm   = $('#bgm');
 
   // ===== WebAudio Graph =====
   let ctx, mainSrc, bgmSrc, mainGain, bgmGain, analyser, dataArray;
@@ -890,6 +903,7 @@ runAuthentication().then(authorized => {
   goInBtn.addEventListener('click', ()=>{ const tr = state.tracks[state.currentIndex]; if(tr && tr.cueIn!=null){ audio.currentTime = tr.cueIn; }});
   clearCueBtn.addEventListener('click', ()=>{ const tr = state.tracks[state.currentIndex]; if(!tr) return; tr.cueIn=null; tr.cueOut=null; renderPlaylists(); saveSettings(); });
 
+  let rafId = null;
   audio.addEventListener('play', ()=>{ if(!rafId) rafId = requestAnimationFrame(loop); });
   audio.addEventListener('pause', ()=>{ if(rafId) { cancelAnimationFrame(rafId); rafId=null; } });
   audio.addEventListener('loadedmetadata', updMainTime);
@@ -981,7 +995,7 @@ runAuthentication().then(authorized => {
   bgmVolNum.addEventListener('input', ()=> setBgmVol(Number(bgmVolNum.value)/100));
   bgmVolDown.addEventListener('click', ()=> setBgmVol(bgmGain.gain.value - 0.05) );
   bgmVolUp.addEventListener('click', ()=> setBgmVol(bgmGain.gain.value + 0.05) );
-
+  
   bgmProgress.addEventListener('click', (e)=>{
     const r = bgmProgress.getBoundingClientRect();
     const ratio = clamp01((e.clientX - r.left) / r.width);
@@ -1293,12 +1307,7 @@ runAuthentication().then(authorized => {
     
     cacheStatus.textContent = 'リポジトリから曲を読み込み中...';
     const githubFiles = await loadPlaylistFromGitHub();
-    
-    if (githubFiles === null) {
-        cacheStatus.textContent = '曲の読み込みに失敗しました。';
-    } else {
-        cacheStatus.textContent = `${githubFiles.length}曲を発見しました。`;
-    }
+    cacheStatus.textContent = githubFiles ? `${githubFiles.length}曲を発見しました。` : '曲の読み込みに失敗しました。';
     
     state.masterTrackList = (githubFiles || []).map(item => ({
         id: crypto.randomUUID(), name: item.name, url: item.path, path: item.path,
@@ -1330,7 +1339,7 @@ runAuthentication().then(authorized => {
   }
 
   initialize();
-});
+})();
 </script>
 </body>
 </html>
