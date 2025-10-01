@@ -788,10 +788,31 @@
   prevBtn.addEventListener('click', () => { if (state.currentIndex > 0) selectIndex(state.currentIndex - 1); });
   nextBtn.addEventListener('click', () => { if (state.currentIndex < state.tracks.length - 1) selectIndex(state.currentIndex + 1); });
   
-  fadeInBtn.addEventListener('click', ()=>{
+  fadeInBtn.addEventListener('click', async () => {
     const tr = state.tracks[state.currentIndex]; if(!tr) return;
-    if(audio.paused) play();
-    if(startFromZero.checked) rampGain(mainGain, 0, 0);
+    const isPaused = audio.paused;
+    if (isPaused) {
+        ensureCtx(); if(!ctx) return;
+        await ctx.resume();
+        rampGain(mainGain, 0, 0); 
+        if(tr.cueIn != null && playFromIn.checked && audio.currentTime < tr.cueIn){ audio.currentTime = tr.cueIn; }
+    }
+    
+    if (isPaused && duckEnable.checked){
+      state.duck.prevVol = bgmGain.gain.value;
+      rampGain(bgmGain, Number(duckTarget.value)/100, Number(duckSec.value));
+    }
+    
+    if (isPaused) {
+        try {
+            await audio.play();
+            playPauseBtn.textContent = '⏸️ 一時停止'; playPauseBtn.classList.remove('primary');
+        } catch(err) {
+            console.error('再生エラー', err); alert('再生できませんでした: ' + err.message);
+            if(duckEnable.checked){ rampGain(bgmGain, state.duck.prevVol, Number(unduckSec.value)); }
+            return;
+        }
+    }
     rampGain(mainGain, tr.volume ?? 1.0, Number(fadeInSec.value));
   });
   fadeOutBtn.addEventListener('click', ()=> fadeMainTo(0, Number(fadeOutSec.value)) );
@@ -806,7 +827,11 @@
   function setMainVol(v, save=true){
     ensureCtx();
     const val = clamp01(v);
-    if(mainGain) mainGain.gain.value = val;
+    if (audio.paused || audio.ended) {
+        rampGain(mainGain, val, 0);
+    } else {
+        mainGain.gain.value = val;
+    }
     volumeSlider.value = String(val);
     volNum.value = String(Math.round(val*100));
     
@@ -892,10 +917,21 @@
   bgmPrevBtn.addEventListener('click', () => { if (state.currentBgmIndex > 0) selectBgmIndex(state.currentBgmIndex - 1); });
   bgmNextBtn.addEventListener('click', () => { if (state.currentBgmIndex < state.bgmTracks.length - 1) selectBgmIndex(state.currentBgmIndex + 1); });
   
-  bgmFadeInBtn.addEventListener('click', ()=>{
+  bgmSeekBack.addEventListener('click', ()=>{ bgm.currentTime = Math.max(0, bgm.currentTime - 5); });
+  bgmSeekFwd.addEventListener('click',  ()=>{ const d=bgm.duration||0; bgm.currentTime = Math.min(d, bgm.currentTime + 5); });
+
+  bgmFadeInBtn.addEventListener('click', async () => {
     const tr = state.bgmTracks[state.currentBgmIndex]; if(!tr) return;
-    if(bgm.paused) bgmPlay();
-    if(bgmStartFromZero.checked) rampGain(bgmGain, 0, 0);
+    const isPaused = bgm.paused;
+    if (isPaused) {
+        ensureCtx(); if(!ctx) return;
+        await ctx.resume();
+        rampGain(bgmGain, 0, 0);
+        if(tr.cueIn != null && bgm.currentTime < tr.cueIn) { bgm.currentTime = tr.cueIn; }
+        try {
+            await bgm.play();
+        } catch(e) { alert('BGM再生失敗: '+e.message); return; }
+    }
     rampGain(bgmGain, tr.volume ?? 0.5, Number(bgmFadeInSec.value));
   });
   bgmFadeOutBtn.addEventListener('click', ()=> bgmFadeTo(0, Number(bgmFadeOutSec.value)) );
@@ -904,7 +940,11 @@
   function setBgmVol(v, save=true){
     ensureCtx();
     const val = clamp01(v);
-    if(bgmGain) bgmGain.gain.value = val;
+    if(bgm.paused || bgm.ended) {
+        rampGain(bgmGain, val, 0);
+    } else {
+        bgmGain.gain.value = val;
+    }
     bgmVolume.value = String(val);
     bgmVolNum.value = String(Math.round(val*100));
 
@@ -917,6 +957,12 @@
   bgmVolNum.addEventListener('input', ()=> setBgmVol(Number(bgmVolNum.value)/100));
   bgmVolDown.addEventListener('click', ()=> setBgmVol(bgmGain.gain.value - 0.05) );
   bgmVolUp.addEventListener('click', ()=> setBgmVol(bgmGain.gain.value + 0.05) );
+
+  bgmProgress.addEventListener('click', (e)=>{
+    const r = bgmProgress.getBoundingClientRect();
+    const ratio = clamp01((e.clientX - r.left) / r.width);
+    if(isFinite(bgm.duration)) bgm.currentTime = ratio * bgm.duration;
+  });
 
   bgmSetInBtn.addEventListener('click', ()=>{ const tr = state.bgmTracks[state.currentBgmIndex]; if(!tr) return; tr.cueIn = Math.floor(bgm.currentTime); renderPlaylists(); saveSettings(); });
   bgmSetOutBtn.addEventListener('click', ()=>{ const tr = state.bgmTracks[state.currentBgmIndex]; if(!tr) return; tr.cueOut = Math.floor(bgm.currentTime); renderPlaylists(); saveSettings(); });
@@ -1179,8 +1225,8 @@
     }));
 
     state.tracks = [...baseTracks];
-    const bgmBaseTracks = JSON.parse(JSON.stringify(baseTracks)); // Deep copy
-    bgmBaseTracks.forEach(t => t.volume = 0.5); // Default BGM volume
+    const bgmBaseTracks = JSON.parse(JSON.stringify(baseTracks));
+    bgmBaseTracks.forEach(t => t.volume = 0.5);
     state.bgmTracks = bgmBaseTracks;
 
     const settings = loadSettings();
