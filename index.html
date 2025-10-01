@@ -4,6 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1, minimum-scale=1" />
 <title>学習発表会 音響コントローラ Pro+</title>
+<link rel="manifest" href="manifest.json">
 <style>
   :root{
     --bg:#0f1115; --fg:#e8eaf0; --muted:#aab3c5; --accent:#7aa2ff; --danger:#ff5d5d; --ok:#2ecc71; --panel:#161a22; --btn:#202736; --border:#2a3142; --yellow:#ffd166;
@@ -21,6 +22,7 @@
   .btn{background:var(--btn);border:1px solid var(--border);border-radius:14px;padding:12px 16px;color:var(--fg);cursor:pointer;font-weight:800;user-select:none;font-size:16px}
   .btn:active{transform:translateY(1px)}
   .btn:hover{background:#2a3142}
+  .btn:disabled {opacity: 0.5; cursor: not-allowed;}
   .btn.primary{background:var(--accent);border-color:transparent;color:#0b1020}
   .btn.danger{background:var(--danger);border-color:transparent;color:#0b1020}
   .btn.ok{background:var(--ok);border-color:transparent;color:#0b1020}
@@ -115,6 +117,15 @@
       <button id="clearList" class="btn" title="全消去">🧹 クリア</button>
     </div>
     <div id="dropzone" class="dropzone" style="margin-top:8px">ここに音声ファイルをドラッグ&ドロップ</div>
+
+    <fieldset style="margin-top:8px">
+        <legend>オフライン</legend>
+        <div class="grid2">
+          <button id="cacheBtn" class="btn ok">📥 全曲を準備</button>
+          <button id="clearCacheBtn" class="btn danger">🗑️ キャッシュ削除</button>
+        </div>
+        <small id="cacheStatus" class="note" style="display:block; margin-top:4px; text-align:center;">&nbsp;</small>
+    </fieldset>
 
     <fieldset style="margin-top:8px">
         <legend>設定</legend>
@@ -411,6 +422,10 @@
   const exportSettingsBtn = $('#exportSettingsBtn');
   const importSettingsBtn = $('#importSettingsBtn');
   const importFile = $('#importFile');
+  const cacheBtn = $('#cacheBtn');
+  const clearCacheBtn = $('#clearCacheBtn');
+  const cacheStatus = $('#cacheStatus');
+
 
   // ====== UI Refs (BGM) ======
   const bgmPlaylistEl = $('#bgmPlaylist');
@@ -457,7 +472,7 @@
   const unduckSec = $('#unduckSec');
 
   // ===== Settings (localStorage) =====
-  const SETTINGS_KEY = 'soundboard.settings.v5'; // version up
+  const SETTINGS_KEY = 'soundboard.settings.v5';
   function saveSettings(){
     try {
       const trackData = {};
@@ -478,7 +493,6 @@
         trackData,
         currentIndex: state.currentIndex,
         currentBgmIndex: state.currentBgmIndex,
-        // Global volumes are no longer saved, as they are now per-track
         toggles: {
           wakeLock: wakeLockToggle.checked,
           autoAdvance: autoAdvance.checked, playFromIn: playFromIn.checked, autoStopAtOut: autoStopAtOut.checked,
@@ -502,7 +516,7 @@
       const data = JSON.parse(raw);
       if (data.version !== 5) {
           console.warn("古いバージョンの設定です。一部が正しく復元されない可能性があります。");
-          localStorage.removeItem(SETTINGS_KEY); // Remove old incompatible settings
+          localStorage.removeItem(SETTINGS_KEY);
           return null;
       }
       return data;
@@ -602,7 +616,7 @@
     const tr = state.tracks[idx];
     if(!tr) { titleEl.textContent = '—'; audio.src = ''; return; }
     
-    setMainVol(tr.volume ?? 1.0, false); // NEW: Apply track-specific volume
+    setMainVol(tr.volume ?? 1.0, false);
     
     titleEl.textContent = tr.name;
     inTimeEl.textContent = tr.cueIn != null ? formatTime(tr.cueIn) : '—';
@@ -625,7 +639,7 @@
     const tr = state.bgmTracks[idx];
     if(!tr) { bgmTitle.textContent = '—'; bgm.src = ''; return; }
 
-    setBgmVol(tr.volume ?? 1.0, false); // NEW: Apply track-specific volume
+    setBgmVol(tr.volume ?? 0.5, false);
 
     bgmTitle.textContent = tr.name;
     bgmInTimeEl.textContent = tr.cueIn != null ? formatTime(tr.cueIn) : '—';
@@ -675,7 +689,7 @@
 
     Array.from(files || []).forEach(f => {
       const url = URL.createObjectURL(f);
-      targetArray.push({id:crypto.randomUUID(), name:f.name, url, kind, path:null, cueIn:null, cueOut:null, volume: 1.0});
+      targetArray.push({id:crypto.randomUUID(), name:f.name, url, kind, path:null, cueIn:null, cueOut:null, volume: isBgmActive ? 0.5 : 1.0});
     });
     
     if (isBgmActive) {
@@ -690,7 +704,7 @@
     const name = prompt('曲名 (省略可)') || url.split('/').pop();
     const isBgmActive = !bgmPlaylistContainer.classList.contains('hidden');
     const targetArray = isBgmActive ? state.bgmTracks : state.tracks;
-    targetArray.push({id:crypto.randomUUID(), name, url, kind:'url', path:url, cueIn:null, cueOut:null, volume: 1.0});
+    targetArray.push({id:crypto.randomUUID(), name, url, kind:'url', path:url, cueIn:null, cueOut:null, volume: isBgmActive ? 0.5 : 1.0});
 
     if (isBgmActive) {
         if(state.currentBgmIndex < 0) selectBgmIndex(0); else renderPlaylists();
@@ -707,7 +721,7 @@
     const tr = state.tracks[state.currentIndex];
     if(!tr) return;
 
-    rampGain(mainGain, startFromZero.checked ? 0 : tr.volume, 0);
+    rampGain(mainGain, startFromZero.checked ? 0 : (tr.volume ?? 1.0), 0);
 
     if(tr.cueIn != null && playFromIn.checked && audio.currentTime < tr.cueIn){ audio.currentTime = tr.cueIn; }
     
@@ -778,7 +792,7 @@
     const tr = state.tracks[state.currentIndex]; if(!tr) return;
     if(audio.paused) play();
     if(startFromZero.checked) rampGain(mainGain, 0, 0);
-    rampGain(mainGain, tr.volume, Number(fadeInSec.value));
+    rampGain(mainGain, tr.volume ?? 1.0, Number(fadeInSec.value));
   });
   fadeOutBtn.addEventListener('click', ()=> fadeMainTo(0, Number(fadeOutSec.value)) );
   fadeStopBtn.addEventListener('click', ()=> fadeMainTo(0, Number(fadeOutSec.value), {stopAfter:true}) );
@@ -831,7 +845,7 @@
     const tr = state.bgmTracks[state.currentBgmIndex];
     if(!tr) return;
     
-    rampGain(bgmGain, bgmStartFromZero.checked ? 0 : tr.volume, 0);
+    rampGain(bgmGain, bgmStartFromZero.checked ? 0 : (tr.volume ?? 0.5), 0);
 
     if(tr.cueIn != null && bgm.currentTime < tr.cueIn) { bgm.currentTime = tr.cueIn; }
 
@@ -882,7 +896,7 @@
     const tr = state.bgmTracks[state.currentBgmIndex]; if(!tr) return;
     if(bgm.paused) bgmPlay();
     if(bgmStartFromZero.checked) rampGain(bgmGain, 0, 0);
-    rampGain(bgmGain, tr.volume, Number(bgmFadeInSec.value));
+    rampGain(bgmGain, tr.volume ?? 0.5, Number(bgmFadeInSec.value));
   });
   bgmFadeOutBtn.addEventListener('click', ()=> bgmFadeTo(0, Number(bgmFadeOutSec.value)) );
   bgmFadeStopBtn.addEventListener('click', ()=> bgmFadeTo(0, Number(bgmFadeOutSec.value), {stopAfter:true}) );
@@ -998,6 +1012,69 @@
   importSettingsBtn.addEventListener('click', () => importFile.click());
   importFile.addEventListener('change', importSettings);
 
+  // ===== Offline Cache Logic =====
+  const AUDIO_CACHE_NAME = 'sound-controller-audio-v1';
+  async function cacheAllAudioFiles() {
+    if (!('caches' in window)) {
+        cacheStatus.textContent = "このブラウザはキャッシュに非対応です。";
+        return;
+    }
+    const allRepoTracks = [...new Map([...state.tracks, ...state.bgmTracks].map(item => [item.path, item])).values()]
+                            .filter(t => t.kind === 'repo');
+    const urlsToCache = allRepoTracks.map(t => t.path);
+    if (urlsToCache.length === 0) {
+        cacheStatus.textContent = "キャッシュ対象の曲がありません。";
+        return;
+    }
+    
+    cacheBtn.disabled = true;
+    clearCacheBtn.disabled = true;
+    
+    try {
+        const cache = await caches.open(AUDIO_CACHE_NAME);
+        let count = 0;
+        for (const url of urlsToCache) {
+            count++;
+            cacheStatus.textContent = `準備中... (${count}/${urlsToCache.length})`;
+            try {
+                await cache.add(new Request(url, { cache: 'reload' })); // Force re-fetch
+            } catch (e) {
+                console.warn(`キャッシュ失敗: ${url}`, e);
+            }
+        }
+        cacheStatus.textContent = `${urlsToCache.length}曲をオフライン用に準備しました。`;
+    } catch (err) {
+        console.error('キャッシュ処理エラー:', err);
+        cacheStatus.textContent = "エラーが発生しました。";
+    } finally {
+        cacheBtn.disabled = false;
+        clearCacheBtn.disabled = false;
+    }
+  }
+
+  async function clearAudioCache() {
+      if (!('caches' in window)) {
+          cacheStatus.textContent = "このブラウザはキャッシュに非対応です。";
+          return;
+      }
+      cacheBtn.disabled = true;
+      clearCacheBtn.disabled = true;
+      cacheStatus.textContent = "キャッシュを削除中...";
+      try {
+          await caches.delete(AUDIO_CACHE_NAME);
+          cacheStatus.textContent = "キャッシュを削除しました。";
+      } catch (err) {
+          console.error('キャッシュ削除エラー:', err);
+          cacheStatus.textContent = "削除中にエラーが発生しました。";
+      } finally {
+          cacheBtn.disabled = false;
+          clearCacheBtn.disabled = false;
+      }
+  }
+
+  cacheBtn.addEventListener('click', cacheAllAudioFiles);
+  clearCacheBtn.addEventListener('click', clearAudioCache);
+  
   // ===== GitHub Loader & Initialization =====
   async function loadPlaylistFromGitHub(){
     const host = window.location.hostname;
@@ -1073,7 +1150,7 @@
             if (savedData) {
                 t.cueIn = savedData.cueIn ?? null;
                 t.cueOut = savedData.cueOut ?? null;
-                t.volume = savedData.volume ?? 1.0;
+                t.volume = savedData.volume ?? (t.isBgm ? 0.5 : 1.0);
             }
         });
     }
@@ -1085,6 +1162,16 @@
   }
 
   async function initialize(){
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').then(registration => {
+          console.log('ServiceWorker registration successful with scope: ', registration.scope);
+        }, err => {
+          console.log('ServiceWorker registration failed: ', err);
+        });
+      });
+    }
+    
     const githubFiles = await loadPlaylistFromGitHub() || [];
     const baseTracks = githubFiles.map(item => ({
         id: crypto.randomUUID(), name: item.name, url: item.path, path: item.path,
@@ -1092,7 +1179,9 @@
     }));
 
     state.tracks = [...baseTracks];
-    state.bgmTracks = [...baseTracks];
+    const bgmBaseTracks = JSON.parse(JSON.stringify(baseTracks)); // Deep copy
+    bgmBaseTracks.forEach(t => t.volume = 0.5); // Default BGM volume
+    state.bgmTracks = bgmBaseTracks;
 
     const settings = loadSettings();
     if (settings) {
