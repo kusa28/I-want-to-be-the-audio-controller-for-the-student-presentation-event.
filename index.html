@@ -118,8 +118,8 @@
     </div>
     <div class="row" style="margin-top:8px">
       <button id="addFromRepoBtn" class="btn">📦 リポジトリから追加</button>
-      <button id="addFiles" class="btn">📁</button>
-      <button id="addUrl" class="btn">🌐</button>
+      <button id="addFiles" class="btn" title="ファイル追加">📁</button>
+      <button id="addUrl" class="btn" title="URL追加">🌐</button>
       <button id="clearList" class="btn" title="全消去">🧹</button>
     </div>
     <div id="dropzone" class="dropzone" style="margin-top:8px">ここに音声ファイルをドラッグ&ドロップ</div>
@@ -315,7 +315,7 @@
 // ▼▼▼ パスワード設定 ▼▼▼
 // ここに、SHA-256でハッシュ化したパスワードを貼り付けてください。
 // 例: '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8' (これは 'password' のハッシュです)
-const PASSWORD_HASH = 'e70655085b1b98bc0aa344d7a79a2bc703af1247331a300e490ed3582d854da9';
+const PASSWORD_HASH = 'ここにコピーしたハッシュ値を貼り付け';
 // ▲▲▲ パスワード設定 ▲▲▲
 // ===============================================================
 
@@ -323,6 +323,7 @@ const PASSWORD_HASH = 'e70655085b1b98bc0aa344d7a79a2bc703af1247331a300e490ed3582
   // --- Authentication ---
   const AUTH_KEY = 'soundboard.auth.session';
   async function hashString(str) {
+      if (!str) return '';
       const encoder = new TextEncoder();
       const data = encoder.encode(str);
       const hash = await crypto.subtle.digest('SHA-256', data);
@@ -333,7 +334,10 @@ const PASSWORD_HASH = 'e70655085b1b98bc0aa344d7a79a2bc703af1247331a300e490ed3582
         return true;
     }
     const enteredPassword = prompt('パスワードを入力してください:');
-    if (!enteredPassword) return false;
+    if (enteredPassword === null) { // User clicked cancel
+        document.body.innerHTML = '<div style="padding: 20px; text-align:center;">キャンセルされました。</div>';
+        return false;
+    }
 
     const enteredHash = await hashString(enteredPassword);
     if (enteredHash === PASSWORD_HASH) {
@@ -343,12 +347,14 @@ const PASSWORD_HASH = 'e70655085b1b98bc0aa344d7a79a2bc703af1247331a300e490ed3582
     return false;
   }
   
-  if (PASSWORD_HASH !== 'ここにコピーしたハッシュ値を貼り付け') {
+  if (PASSWORD_HASH !== 'ここにコピーしたハッシュ値を貼り付け' && PASSWORD_HASH !== '') {
       let authorized = false;
       while(!authorized) {
           authorized = await checkAuth();
-          if (!authorized) {
+          if (!authorized && authorized !== null) { // Check for null to avoid alert on cancel
               alert('パスワードが違います。');
+          } else if (authorized === null) {
+              return; // Stop execution if user cancelled
           }
       }
   }
@@ -392,7 +398,7 @@ const PASSWORD_HASH = 'e70655085b1b98bc0aa344d7a79a2bc703af1247331a300e490ed3582
 
   // ===== State =====
   const state = {
-    masterTrackList: [], // All tracks from GitHub are stored here permanently
+    masterTrackList: [], 
     tracks: [],
     bgmTracks: [],
     filter: '',
@@ -708,7 +714,6 @@ const PASSWORD_HASH = 'e70655085b1b98bc0aa344d7a79a2bc703af1247331a300e490ed3582
     const targetArray = isBgm ? state.bgmTracks : state.tracks;
     const removedTrack = targetArray[i];
     
-    // For repo tracks, just remove from visible list. For local/URL, really remove.
     if (removedTrack.kind === 'repo') {
         targetArray.splice(i,1);
     } else {
@@ -975,6 +980,12 @@ const PASSWORD_HASH = 'e70655085b1b98bc0aa344d7a79a2bc703af1247331a300e490ed3582
   bgmVolDown.addEventListener('click', ()=> setBgmVol(bgmGain.gain.value - 0.05) );
   bgmVolUp.addEventListener('click', ()=> setBgmVol(bgmGain.gain.value + 0.05) );
 
+  bgmProgress.addEventListener('click', (e)=>{ // BUGFIX: This was missing
+    const r = bgmProgress.getBoundingClientRect();
+    const ratio = clamp01((e.clientX - r.left) / r.width);
+    if(isFinite(bgm.duration)) bgm.currentTime = ratio * bgm.duration;
+  });
+
   bgmSetInBtn.addEventListener('click', ()=>{ const tr = state.bgmTracks[state.currentBgmIndex]; if(!tr) return; tr.cueIn = Math.floor(bgm.currentTime); renderPlaylists(); saveSettings(); });
   bgmSetOutBtn.addEventListener('click', ()=>{ const tr = state.bgmTracks[state.currentBgmIndex]; if(!tr) return; tr.cueOut = Math.floor(bgm.currentTime); renderPlaylists(); saveSettings(); });
   bgmGoInBtn.addEventListener('click', ()=>{ const tr = state.bgmTracks[state.currentBgmIndex]; if(tr && tr.cueIn!=null){ bgm.currentTime = tr.cueIn; }});
@@ -1092,7 +1103,6 @@ const PASSWORD_HASH = 'e70655085b1b98bc0aa344d7a79a2bc703af1247331a300e490ed3582
             count++;
             cacheStatus.textContent = `準備中... (${count}/${urlsToCache.length})`;
             try {
-                // If already cached, don't re-fetch
                 const existing = await cache.match(url);
                 if (!existing) {
                     await cache.add(new Request(url, { cache: 'reload' }));
@@ -1217,7 +1227,7 @@ const PASSWORD_HASH = 'e70655085b1b98bc0aa344d7a79a2bc703af1247331a300e490ed3582
     renderPlaylists();
   }
   
-  // Repo Track Restore Modal
+  addFromRepoBtn.addEventListener('click', showRepoModal);
   function showRepoModal() {
     const isBgm = !bgmPlaylistContainer.classList.contains('hidden');
     const currentList = isBgm ? state.bgmTracks : state.tracks;
@@ -1258,22 +1268,15 @@ const PASSWORD_HASH = 'e70655085b1b98bc0aa344d7a79a2bc703af1247331a300e490ed3582
         const selectedPaths = [...content.querySelectorAll('input:checked')].map(input => input.value);
         const tracksToAdd = state.masterTrackList.filter(t => selectedPaths.includes(t.path));
         
-        // Deep copy to avoid reference issues
         const newTracks = JSON.parse(JSON.stringify(tracksToAdd));
-        
-        if (isBgm) {
-            state.bgmTracks.push(...newTracks);
-        } else {
-            state.tracks.push(...newTracks);
-        }
+        const targetArray = isBgm ? state.bgmTracks : state.tracks;
+        targetArray.push(...newTracks);
         
         renderPlaylists();
         saveSettings();
         overlay.remove();
     });
   }
-  addFromRepoBtn.addEventListener('click', showRepoModal);
-
 
   async function initialize(){
     if ('serviceWorker' in navigator) {
@@ -1286,16 +1289,19 @@ const PASSWORD_HASH = 'e70655085b1b98bc0aa344d7a79a2bc703af1247331a300e490ed3582
       });
     }
     
-    const githubFiles = await loadPlaylistFromGitHub() || [];
-    state.masterTrackList = githubFiles.map(item => ({
+    cacheStatus.textContent = 'リポジトリから曲を読み込み中...';
+    const githubFiles = await loadPlaylistFromGitHub();
+    cacheStatus.textContent = githubFiles ? `${githubFiles.length}曲を発見しました。` : '曲の読み込みに失敗しました。';
+    
+    state.masterTrackList = (githubFiles || []).map(item => ({
         id: crypto.randomUUID(), name: item.name, url: item.path, path: item.path,
         kind: 'repo', cueIn: null, cueOut: null, volume: 1.0
     }));
 
-    // Make default copies for initial state
     state.tracks = JSON.parse(JSON.stringify(state.masterTrackList));
-    state.bgmTracks = JSON.parse(JSON.stringify(state.masterTrackList));
-    state.bgmTracks.forEach(t => t.volume = 0.5);
+    const bgmBaseTracks = JSON.parse(JSON.stringify(state.masterTrackList));
+    bgmBaseTracks.forEach(t => t.volume = 0.5);
+    state.bgmTracks = bgmBaseTracks;
 
     const settings = loadSettings();
     if (settings) {
