@@ -70,16 +70,12 @@
   .tabs{display:flex;gap:4px; border-bottom: 1px solid var(--border); margin-bottom: 8px;}
   .tabs button{background:transparent;border:0;color:var(--muted);padding:8px 12px;font-size:16px;font-weight:bold;cursor:pointer; border-bottom: 3px solid transparent;}
   .tabs button.active{color:var(--accent); border-bottom-color: var(--accent);}
-  /* Modal Styles */
-  .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); display: flex; justify-content: center; align-items: center; z-index: 1000; }
-  .modal-content { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 16px; max-width: 500px; width: 90%; max-height: 80vh; display: flex; flex-direction: column; }
-  .modal-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex-grow: 1; }
-  .modal-list li { display: flex; align-items: center; gap: 10px; padding: 8px; border-bottom: 1px solid var(--border); }
-  .modal-footer { margin-top: 16px; display: flex; justify-content: flex-end; gap: 8px; }
-  
-  /* Initial hidden state */
-  .container, header { display: none; }
-
+  .modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);z-index:100;display:flex;align-items:center;justify-content:center;padding:16px;opacity:0;visibility:hidden;transition:opacity .2s, visibility .2s;}
+  .modal-overlay.visible{opacity:1;visibility:visible;}
+  .modal-content{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px;width:100%;max-width:500px;max-height:80vh;display:flex;flex-direction:column;}
+  .modal-list{list-style:none;padding:0;margin:0;overflow:auto;flex-grow:1;}
+  .modal-list li{display:flex;align-items:center;gap:12px;padding:8px;border-bottom:1px solid var(--border);}
+  .modal-list li:last-child{border-bottom:0;}
 </style>
 </head>
 <body>
@@ -99,7 +95,6 @@
       <button id="tabBgm">BGM</button>
     </div>
 
-    <!-- メインのプレイリスト -->
     <div id="playlistContainer" class="playlist-container">
       <div class="row" style="justify-content:space-between">
         <strong>メイン プレイリスト</strong>
@@ -108,7 +103,6 @@
       <ul id="playlist" class="playlist" aria-label="Playlist"></ul>
     </div>
 
-    <!-- BGMライブラリ -->
     <div id="bgmPlaylistContainer" class="playlist-container hidden">
       <div class="row" style="justify-content:space-between">
         <strong>BGM ライブラリ</strong>
@@ -120,11 +114,11 @@
     <div class="row" style="margin-top:8px">
       <input id="search" type="text" placeholder="検索 (曲名)" style="flex:1"/>
     </div>
-    <div class="row" style="margin-top:8px">
-      <button id="addFromRepoBtn" class="btn">📦 リポジトリから追加</button>
-      <button id="addFiles" class="btn" title="ファイル追加">📁</button>
-      <button id="addUrl" class="btn" title="URL追加">🌐</button>
-      <button id="clearList" class="btn" title="全消去">🧹</button>
+    <div class="grid3" style="margin-top:8px">
+      <input id="fileInput" type="file" accept="audio/*" multiple style="display:none"/>
+      <button id="addFiles" class="btn">📁</button>
+      <button id="addUrl" class="btn">🌐</button>
+      <button id="addFromRepo" class="btn">🎵</button>
     </div>
     <div id="dropzone" class="dropzone" style="margin-top:8px">ここに音声ファイルをドラッグ&ドロップ</div>
 
@@ -311,71 +305,23 @@
   </main>
 </div>
 
+<!-- Modal for adding tracks from repository -->
+<div id="repoModal" class="modal-overlay">
+  <div class="modal-content">
+    <div class="row" style="justify-content:space-between; margin-bottom: 12px;">
+      <h2>リポジトリから追加</h2>
+      <button id="closeRepoModal" class="btn danger">✖</button>
+    </div>
+    <ul id="repoModalList" class="modal-list"></ul>
+  </div>
+</div>
+
 <audio id="audio" crossorigin="anonymous"></audio>
 <audio id="bgm" crossorigin="anonymous"></audio>
 
 <script>
-// ===============================================================
-// ▼▼▼ パスワード設定 ▼▼▼
-// ここに、SHA-256でハッシュ化したパスワードを貼り付けてください。
-// 例: '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8' (これは 'password' のハッシュです)
-const PASSWORD_HASH = 'ここにコピーしたハッシュ値を貼り付け';
-// ▲▲▲ パスワード設定 ▲▲▲
-// ===============================================================
-
-(async () => {
+(() => {
   const $ = (sel) => document.querySelector(sel);
-  
-  // --- Authentication ---
-  const AUTH_KEY = 'soundboard.auth.session';
-  async function hashString(str) {
-      if (!str) return '';
-      const encoder = new TextEncoder();
-      const data = encoder.encode(str);
-      const hash = await crypto.subtle.digest('SHA-256', data);
-      return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
-  }
-  async function checkAuth() {
-    if (sessionStorage.getItem(AUTH_KEY) === 'ok') return true;
-    const enteredPassword = prompt('パスワードを入力してください:');
-    if (enteredPassword === null) return null; // User clicked cancel
-
-    const enteredHash = await hashString(enteredPassword);
-    if (enteredHash === PASSWORD_HASH) {
-        sessionStorage.setItem(AUTH_KEY, 'ok');
-        return true;
-    }
-    return false;
-  }
-  
-  async function runAuthentication() {
-    if (PASSWORD_HASH === 'ここにコピーしたハッシュ値を貼り付け' || PASSWORD_HASH === '') {
-        return true; // No password set, proceed
-    }
-    let authorized = false;
-    while(!authorized) {
-        const authResult = await checkAuth();
-        if (authResult === true) {
-            authorized = true;
-        } else if (authResult === null) {
-            document.body.innerHTML = '<div style="padding: 20px; text-align:center;">キャンセルされました。</div>';
-            return false; // Stop execution
-        } else {
-            alert('パスワードが違います。');
-        }
-    }
-    return true;
-  }
-  
-  const isAuthenticated = await runAuthentication();
-  if (!isAuthenticated) return; // Stop if not authenticated
-  
-  // Show the main content
-  $('.container').style.display = 'grid';
-  $('header').style.display = 'flex';
-
-
-  // --- App Initialization ---
   const audio = $('#audio');
   const bgm   = $('#bgm');
 
@@ -413,7 +359,7 @@ const PASSWORD_HASH = 'ここにコピーしたハッシュ値を貼り付け';
 
   // ===== State =====
   const state = {
-    masterTrackList: [], 
+    repoTracks: [], // Master list of all tracks from GitHub
     tracks: [],
     bgmTracks: [],
     filter: '',
@@ -484,9 +430,9 @@ const PASSWORD_HASH = 'ここにコピーしたハッシュ値を貼り付け';
   const playlistContainer = $('#playlistContainer');
   const bgmPlaylistContainer = $('#bgmPlaylistContainer');
   const addFilesBtn = $('#addFiles');
-  const fileInput = $('#fileInput');
   const addUrlBtn = $('#addUrl');
-  const addFromRepoBtn = $('#addFromRepoBtn');
+  const addFromRepoBtn = $('#addFromRepo');
+  const fileInput = $('#fileInput');
   const clearListBtn = $('#clearList');
   const search = $('#search');
   const dropzone = $('#dropzone');
@@ -496,6 +442,9 @@ const PASSWORD_HASH = 'ここにコピーしたハッシュ値を貼り付け';
   const cacheBtn = $('#cacheBtn');
   const clearCacheBtn = $('#clearCacheBtn');
   const cacheStatus = $('#cacheStatus');
+  const repoModal = $('#repoModal');
+  const repoModalList = $('#repoModalList');
+  const closeRepoModalBtn = $('#closeRepoModal');
 
 
   // ====== UI Refs (BGM) ======
@@ -548,7 +497,7 @@ const PASSWORD_HASH = 'ここにコピーしたハッシュ値を貼り付け';
     try {
       const trackData = {};
       const uniqueTracks = new Map();
-      [...state.masterTrackList, ...state.tracks, ...state.bgmTracks].forEach(t => {
+      [...state.repoTracks, ...state.tracks, ...state.bgmTracks].forEach(t => {
           if (t.path && !uniqueTracks.has(t.path)) {
               uniqueTracks.set(t.path, t);
           }
@@ -727,14 +676,7 @@ const PASSWORD_HASH = 'ここにコピーしたハッシュ値を貼り付け';
 
   function removeAt(i, isBgm){
     const targetArray = isBgm ? state.bgmTracks : state.tracks;
-    const removedTrack = targetArray[i];
-    
-    if (removedTrack.kind === 'repo') {
-        targetArray.splice(i,1);
-    } else {
-        const [removed] = targetArray.splice(i,1);
-        try{ if(removed.kind==='local' && removed.url.startsWith('blob:')) URL.revokeObjectURL(removed.url);}catch{}
-    }
+    targetArray.splice(i,1);
     
     if (isBgm) {
       if(state.currentBgmIndex === i){
@@ -903,7 +845,6 @@ const PASSWORD_HASH = 'ここにコピーしたハッシュ値を貼り付け';
   goInBtn.addEventListener('click', ()=>{ const tr = state.tracks[state.currentIndex]; if(tr && tr.cueIn!=null){ audio.currentTime = tr.cueIn; }});
   clearCueBtn.addEventListener('click', ()=>{ const tr = state.tracks[state.currentIndex]; if(!tr) return; tr.cueIn=null; tr.cueOut=null; renderPlaylists(); saveSettings(); });
 
-  let rafId = null;
   audio.addEventListener('play', ()=>{ if(!rafId) rafId = requestAnimationFrame(loop); });
   audio.addEventListener('pause', ()=>{ if(rafId) { cancelAnimationFrame(rafId); rafId=null; } });
   audio.addEventListener('loadedmetadata', updMainTime);
@@ -995,12 +936,6 @@ const PASSWORD_HASH = 'ここにコピーしたハッシュ値を貼り付け';
   bgmVolNum.addEventListener('input', ()=> setBgmVol(Number(bgmVolNum.value)/100));
   bgmVolDown.addEventListener('click', ()=> setBgmVol(bgmGain.gain.value - 0.05) );
   bgmVolUp.addEventListener('click', ()=> setBgmVol(bgmGain.gain.value + 0.05) );
-  
-  bgmProgress.addEventListener('click', (e)=>{
-    const r = bgmProgress.getBoundingClientRect();
-    const ratio = clamp01((e.clientX - r.left) / r.width);
-    if(isFinite(bgm.duration)) bgm.currentTime = ratio * bgm.duration;
-  });
 
   bgmSetInBtn.addEventListener('click', ()=>{ const tr = state.bgmTracks[state.currentBgmIndex]; if(!tr) return; tr.cueIn = Math.floor(bgm.currentTime); renderPlaylists(); saveSettings(); });
   bgmSetOutBtn.addEventListener('click', ()=>{ const tr = state.bgmTracks[state.currentBgmIndex]; if(!tr) return; tr.cueOut = Math.floor(bgm.currentTime); renderPlaylists(); saveSettings(); });
@@ -1012,7 +947,7 @@ const PASSWORD_HASH = 'ここにコピーしたハッシュ値を貼り付け';
   bgm.addEventListener('pause', () => { bgmPlayPauseBtn.textContent = '▶️ BGM再生'; bgmPlayPauseBtn.classList.add('ok'); });
   bgmLoop.addEventListener('change', () => { bgm.loop = bgmLoop.checked; saveSettings(); });
 
-  // ===== Left Panel Logic =====
+  // ===== Left Panel Logic (Tabs, D&D, etc) =====
   tabPlaylist.addEventListener('click', () => {
     tabPlaylist.classList.add('active'); tabBgm.classList.remove('active');
     playlistContainer.classList.remove('hidden'); bgmPlaylistContainer.classList.add('hidden');
@@ -1024,19 +959,14 @@ const PASSWORD_HASH = 'ここにコピーしたハッシュ値を貼り付け';
     saveSettings();
   });
   addFilesBtn.addEventListener('click', ()=> fileInput.click());
-  fileInput.addEventListener('change', (e)=> addFiles(e.target.files));
   addUrlBtn.addEventListener('click', addUrlPrompt);
   clearListBtn.addEventListener('click', ()=>{
     const isBgmActive = !bgmPlaylistContainer.classList.contains('hidden');
-    const targetArray = isBgmActive ? state.bgmTracks : state.tracks;
-    const repoTracks = targetArray.filter(t => t.kind === 'repo');
-    targetArray.forEach(t=>{ if(t.kind==='local' && t.url.startsWith('blob:')) try{URL.revokeObjectURL(t.url);}catch{} });
-    
     if (isBgmActive) {
-      state.bgmTracks = repoTracks;
+      state.bgmTracks = [];
       selectBgmIndex(0);
     } else {
-      state.tracks = repoTracks;
+      state.tracks = [];
       selectIndex(0);
     }
     renderPlaylists(); saveSettings();
@@ -1103,7 +1033,7 @@ const PASSWORD_HASH = 'ここにコピーしたハッシュ値を貼り付け';
         cacheStatus.textContent = "このブラウザはキャッシュに非対応です。";
         return;
     }
-    const urlsToCache = state.masterTrackList.map(t => t.path);
+    const urlsToCache = state.repoTracks.map(t => t.path);
     if (urlsToCache.length === 0) {
         cacheStatus.textContent = "キャッシュ対象の曲がありません。";
         return;
@@ -1119,10 +1049,7 @@ const PASSWORD_HASH = 'ここにコピーしたハッシュ値を貼り付け';
             count++;
             cacheStatus.textContent = `準備中... (${count}/${urlsToCache.length})`;
             try {
-                const existing = await cache.match(url);
-                if (!existing) {
-                    await cache.add(new Request(url, { cache: 'reload' }));
-                }
+                await cache.add(new Request(url, { cache: 'reload' }));
             } catch (e) {
                 console.warn(`キャッシュ失敗: ${url}`, e);
             }
@@ -1160,6 +1087,58 @@ const PASSWORD_HASH = 'ここにコピーしたハッシュ値を貼り付け';
   cacheBtn.addEventListener('click', cacheAllAudioFiles);
   clearCacheBtn.addEventListener('click', clearAudioCache);
   
+  // ===== Repository Modal Logic =====
+  function openRepoModal() {
+    const isBgmActive = !bgmPlaylistContainer.classList.contains('hidden');
+    const currentTracks = isBgmActive ? state.bgmTracks : state.tracks;
+    const currentTrackPaths = new Set(currentTracks.map(t => t.path));
+
+    repoModalList.innerHTML = '';
+    state.repoTracks.forEach(track => {
+        const li = document.createElement('li');
+        li.innerHTML = `<span style="flex-grow: 1;">${track.name}</span>`;
+        const btn = document.createElement('button');
+        btn.classList.add('btn');
+
+        if (currentTrackPaths.has(track.path)) {
+            btn.textContent = '追加済み';
+            btn.disabled = true;
+        } else {
+            btn.textContent = '追加';
+            btn.dataset.path = track.path;
+        }
+        
+        li.appendChild(btn);
+        repoModalList.appendChild(li);
+    });
+    repoModal.classList.add('visible');
+  }
+
+  repoModalList.addEventListener('click', e => {
+    if (e.target.dataset.path) {
+        const path = e.target.dataset.path;
+        const trackToAdd = state.repoTracks.find(t => t.path === path);
+        if (trackToAdd) {
+            const isBgmActive = !bgmPlaylistContainer.classList.contains('hidden');
+            const targetArray = isBgmActive ? state.bgmTracks : state.tracks;
+            targetArray.push(JSON.parse(JSON.stringify(trackToAdd))); // Add a copy
+            renderPlaylists();
+            saveSettings();
+            e.target.textContent = '追加済み';
+            e.target.disabled = true;
+        }
+    }
+  });
+
+  addFromRepoBtn.addEventListener('click', openRepoModal);
+  closeRepoModalBtn.addEventListener('click', () => repoModal.classList.remove('visible'));
+  repoModal.addEventListener('click', (e) => {
+      if(e.target === repoModal) {
+          repoModal.classList.remove('visible');
+      }
+  });
+
+
   // ===== GitHub Loader & Initialization =====
   async function loadPlaylistFromGitHub(){
     const host = window.location.hostname;
@@ -1214,16 +1193,16 @@ const PASSWORD_HASH = 'ここにコピーしたハッシュ値を貼り付け';
     }
     if(settings.ui) {
         search.value = settings.ui.searchFilter || '';
-        if(settings.ui.activeTab === 'bgm') { tabBgm.click(); } else { tabPlaylist.click(); }
+        if(settings.ui.activeTab === 'bgm') tabBgm.click(); else tabPlaylist.click();
     }
     
-    const trackMap = new Map(state.masterTrackList.map(t => [t.path, JSON.parse(JSON.stringify(t))]));
+    const repoTracksMap = new Map(state.repoTracks.map(t => [t.path, JSON.parse(JSON.stringify(t))]));
     
     if (settings.playlistOrder) {
-        state.tracks = settings.playlistOrder.map(path => trackMap.get(path)).filter(Boolean);
+        state.tracks = settings.playlistOrder.map(path => repoTracksMap.get(path)).filter(Boolean);
     }
     if (settings.bgmPlaylistOrder) {
-        state.bgmTracks = settings.bgmPlaylistOrder.map(path => trackMap.get(path)).filter(Boolean);
+        state.bgmTracks = settings.bgmPlaylistOrder.map(path => repoTracksMap.get(path)).filter(Boolean);
     }
     
     if (settings.trackData) {
@@ -1242,57 +1221,6 @@ const PASSWORD_HASH = 'ここにコピーしたハッシュ値を貼り付け';
 
     renderPlaylists();
   }
-  
-  addFromRepoBtn.addEventListener('click', showRepoModal);
-  function showRepoModal() {
-    const isBgm = !bgmPlaylistContainer.classList.contains('hidden');
-    const currentList = isBgm ? state.bgmTracks : state.tracks;
-    const currentPaths = new Set(currentList.map(t => t.path));
-    const missingTracks = state.masterTrackList.filter(t => !currentPaths.has(t.path));
-
-    if (missingTracks.length === 0) {
-        alert("すべてのリポジトリ音源がリストにあります。");
-        return;
-    }
-
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
-    
-    const content = document.createElement('div');
-    content.className = 'modal-content';
-    content.innerHTML = `
-        <h3>リポジトリから${isBgm ? 'BGM' : '曲'}を追加</h3>
-        <ul class="modal-list">
-            ${missingTracks.map(t => `
-                <li>
-                    <input type="checkbox" id="track-${t.id}" value="${t.path}">
-                    <label for="track-${t.id}">${t.name}</label>
-                </li>
-            `).join('')}
-        </ul>
-        <div class="modal-footer">
-            <button id="modal-cancel" class="btn">キャンセル</button>
-            <button id="modal-add" class="btn primary">追加</button>
-        </div>
-    `;
-    overlay.appendChild(content);
-    document.body.appendChild(overlay);
-
-    overlay.addEventListener('click', (e) => { if(e.target === overlay) overlay.remove(); });
-    content.querySelector('#modal-cancel').addEventListener('click', () => overlay.remove());
-    content.querySelector('#modal-add').addEventListener('click', () => {
-        const selectedPaths = [...content.querySelectorAll('input:checked')].map(input => input.value);
-        const tracksToAdd = state.masterTrackList.filter(t => selectedPaths.includes(t.path));
-        
-        const newTracks = JSON.parse(JSON.stringify(tracksToAdd));
-        const targetArray = isBgm ? state.bgmTracks : state.tracks;
-        targetArray.push(...newTracks);
-        
-        renderPlaylists();
-        saveSettings();
-        overlay.remove();
-    });
-  }
 
   async function initialize(){
     if ('serviceWorker' in navigator) {
@@ -1305,24 +1233,25 @@ const PASSWORD_HASH = 'ここにコピーしたハッシュ値を貼り付け';
       });
     }
     
-    cacheStatus.textContent = 'リポジトリから曲を読み込み中...';
-    const githubFiles = await loadPlaylistFromGitHub();
-    cacheStatus.textContent = githubFiles ? `${githubFiles.length}曲を発見しました。` : '曲の読み込みに失敗しました。';
-    
-    state.masterTrackList = (githubFiles || []).map(item => ({
+    const githubFiles = await loadPlaylistFromGitHub() || [];
+    state.repoTracks = githubFiles.map(item => ({
         id: crypto.randomUUID(), name: item.name, url: item.path, path: item.path,
-        kind: 'repo', cueIn: null, cueOut: null, volume: 1.0
+        kind: 'repo', cueIn: null, cueOut: null, volume: 1.0 
     }));
-
-    state.tracks = JSON.parse(JSON.stringify(state.masterTrackList));
-    const bgmBaseTracks = JSON.parse(JSON.stringify(state.masterTrackList));
-    bgmBaseTracks.forEach(t => t.volume = 0.5);
-    state.bgmTracks = bgmBaseTracks;
+    
+    // Default playlist content is empty, to be populated from settings
+    state.tracks = [];
+    state.bgmTracks = [];
 
     const settings = loadSettings();
     if (settings) {
         applySettings(settings);
     } else {
+        // If no settings, populate with all repo tracks by default
+        state.tracks = JSON.parse(JSON.stringify(state.repoTracks));
+        state.bgmTracks = JSON.parse(JSON.stringify(state.repoTracks));
+        state.bgmTracks.forEach(t => t.volume = 0.5);
+
         selectIndex(0);
         selectBgmIndex(0);
         renderPlaylists();
